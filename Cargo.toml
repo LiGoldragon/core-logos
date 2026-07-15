@@ -1,0 +1,27 @@
+[package]
+name         = "core-logos"
+version      = "0.1.0"
+edition      = "2024"
+rust-version = "1.85"
+license      = "MIT OR Apache-2.0"
+repository   = "https://github.com/LiGoldragon/core-logos"
+description  = "The stringless Core algebra of Logos: a closed CoreItem data language 1-to-1 with Rust at the Core, text-free, PortableArchive, content-addressed with a NameTable-excluded identity. The TextualRust codec is a later sibling crate."
+publish      = false
+
+[lib]
+name = "core_logos"
+path = "src/lib.rs"
+
+[dependencies]
+content-identity = { git = "https://github.com/LiGoldragon/content-identity.git", rev = "6cc0408cdb96f174cc8fdf6ca23420038de28450" }
+name-table       = { git = "https://github.com/LiGoldragon/name-table.git", rev = "c3237f77c087e6feab49d6cf34971cebc14a11e6" }
+rkyv             = { version = "0.8", default-features = false, features = ["std", "bytecheck", "little_endian", "pointer_width_32", "unaligned"] }
+thiserror        = "2"
+
+[dev-dependencies]
+core-schema = { git = "https://github.com/LiGoldragon/core-schema.git", rev = "33e5be2769b87920b773c7707c1ceb2c97cd42e8" }
+
+[lints.rust]
+unsafe_code = "forbid"
+unused      = { level = "warn", priority = -1 }
+dead_code   = "warn"
