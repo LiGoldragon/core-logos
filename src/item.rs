@@ -39,6 +39,22 @@ impl CoreItem {
         }
     }
 
+    /// This item with its visibility replaced. Exhaustive over the closed algebra —
+    /// no wildcard arm. The stamping verb lives on the item that owns the
+    /// visibility field: a caller lowering authoritative API intent (a schema
+    /// declaration's Public/Private) stamps the produced item without reaching into
+    /// each variant. Attributes, name, and structure are untouched, so this never
+    /// moves anything but the visibility a projection reads.
+    pub fn with_visibility(mut self, visibility: crate::visibility::Visibility) -> Self {
+        match &mut self {
+            CoreItem::Newtype(newtype) => newtype.visibility = visibility,
+            CoreItem::Struct(structure) => structure.visibility = visibility,
+            CoreItem::Enumeration(enumeration) => enumeration.visibility = visibility,
+            CoreItem::Alias(alias) => alias.visibility = visibility,
+        }
+        self
+    }
+
     /// The ordered attribute preamble of this item. Exhaustive over the closed
     /// algebra — no wildcard arm.
     pub fn attributes(&self) -> &[Attribute] {
