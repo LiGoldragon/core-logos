@@ -64,24 +64,81 @@ logos names append above the base.
 
 The accepted Rust-lowering ontology (`reports/logos/logos-rust-lowering-v1.md`)
 names seven item kinds: `Newtype`, `Struct`, `Enumeration`, `Alias`,
-`TraitDefinition`, `ImplBlock`, `FreeMethod`. This crate is scoped to the
-**wire-contract data subset the goldens exercise**: `Newtype`, `Struct`,
-`Enumeration`, `Alias`, plus the leaf vocabulary (attributes, visibility, paths,
-generics by kind).
+`TraitDefinition`, `ImplBlock`, `FreeMethod`. This crate carries the
+**wire-contract data subset** — `Newtype`, `Struct`, `Enumeration`, `Alias`, plus
+the leaf vocabulary (attributes, visibility, paths, generics by kind) — **and now
+`ImplBlock` and `Function`** (the ontology's `FreeMethod`, modeled as one node that
+serves both an impl member and a free function).
 
-`TraitDefinition`, `ImplBlock`, and `FreeMethod` are deliberately **left out** of
-this slice. They appear in the goldens (`reports/codex-rust-construct-survey.md`
-§1–§2: trait definitions, `From` impls, per-variant constructors, `Display`/`Error`
-pairs), but their method **bodies** are arbitrary Rust logic the Core does not yet
-model as data (the survey's "beyond a data-shape generator" tier; the lowering
-report §6.4 "honest frontier"). Their type and trait skeletons are in-subset, but
-modeling them without a body vocabulary would be incomplete. A closed enum grows by
-design, not by speculation: these variants are added when the TextualRust sibling
-and a method-body vocabulary land. Const generic parameters are excluded on the
-same basis (the survey did not witness them).
+`ImplBlock` and `Function` carry their method **bodies** as data — the closed
+**Tier-1 expression vocabulary** (`src/expression.rs`, `src/pattern.rs`), exactly
+the class-A-and-kin body shapes the wire goldens exercise and nothing extensible by
+string:
+
+- `self`; a reference `&self.0`; a tuple-index field access `self.0`;
+- a call of a plain or trait-qualified path callee — `Self(payload.into())`,
+  `Self::new(payload)`, `Self::Record(payload)`, `RecordIdentifier::new(payload)`,
+  `<Self as Trait>::method(self)`;
+- a method call — `payload.into()`, `self.0.name()`;
+- a string literal — `"SignalInputRecord"`;
+- a `match` over a scrutinee whose arms map a variant pattern (a unit-like path
+  `InputRoute::Record`, or a tuple variant `Self::Record(_)` / `Self::Input(route)`)
+  to a body expression (a unit path, a string literal, or a nested match).
+
+Function bodies are a **single tail expression** — the witnessed Tier-1 bodies carry
+no statements, so no `let`/`return` statement vocabulary is modeled. Matches are
+exhaustive with no wildcard arm; the whole vocabulary is closed and dispatches on
+node kind, never on a head string.
+
+`TraitDefinition` remains **left out**: its method signatures are in-subset shape
+but its associated types and default bodies would need more than the Tier-1
+vocabulary. Class-B bodies (`let` bindings, early `return`, struct-literal
+construction `Self { … }`, named field access, `&mut`, closures) are the honest
+frontier beyond Tier-1; a body carrying them is not modeled and the TextualRust
+reader rejects it loudly. Const generic parameters remain excluded (unwitnessed).
 
 Totality is structural: `CoreItem`'s methods match every variant with no wildcard
-arm, so a new item kind is a compile error until its handling is written.
+arm, so a new item kind is a compile error until its handling is written. An impl
+block declares no name, so `CoreItem::name` returns `Option<Identifier>` — the "does
+this item have a name?" question dissolves into a normal `None` rather than a
+fabricated identifier, and an impl block has no visibility, so `with_visibility`
+returns it unchanged.
+
+## Named revisable leans (Tier-1 vocabulary boundary)
+
+Every choice below the psyche rulings is a revisable lean with a stated trigger:
+
+- **The Tier-1 body vocabulary boundary** is drawn at the class-A-and-kin shapes
+  above. *Trigger:* a witnessed wire body needs a shape outside it (a statement, a
+  struct literal, a binary operator, a closure) — extend the vocabulary then, not
+  speculatively.
+- **String-literal content is stored data, not an interned name.** A name is
+  interned and excluded from content identity (rename-stable); a string literal's
+  content is semantic and is hashed as part of the value, so `Expression::StringLiteral`
+  carries a `String`. This is the one place a Core value holds owned text, and it is
+  literal-value data, not the raw-token-text escape hatch the text-free boundary
+  forbids. *Trigger:* if a projection ever needs to intern literal content, revisit.
+- **Shared references only.** `&mut` (exclusive borrow, `&mut self`) is unwitnessed
+  in Tier-1 bodies, so `ReferenceType` and `Receiver` model only the shared form.
+  *Trigger:* a witnessed Tier-1 signature borrows mutably.
+- **Tuple-index field access only.** Named field access (`self.origin_route`) is
+  unwitnessed in a fully-Tier-1 body (the impls that use it carry class-B struct
+  literals and are rejected whole). *Trigger:* a fully-Tier-1 body accesses a named
+  field.
+
+## Content identity and layout version across this growth
+
+Adding `ImplBlock`, `Function`, and the two new `TypeReference` variants
+(`Reference`, `ImplTrait`) is **append-only** enum growth: existing variants keep
+their rkyv discriminants, so every pre-existing Core value archives to byte-identical
+bytes and its content identity does not move. The new item kinds enter identity
+hashing (they are `CoreItem` values under `CoreLogosDomain`), but they are new
+content getting first-time hashes under the existing layout — there is no prior
+layout-1 hash they conflict with. Because no previously-computed identity changes,
+the truthful versioning call is to **keep `LayoutVersion(1)`**: bumping would move
+every existing hash for no semantic reason, manufacturing a break. The layout
+version protects pre-image *format* compatibility, and the format is unchanged for
+all existing values — the algebra grew, as it is designed to.
 
 ## Release-train status
 

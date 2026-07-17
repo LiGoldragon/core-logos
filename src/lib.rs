@@ -20,11 +20,15 @@ pub mod attribute;
 pub mod domain;
 pub mod enumeration;
 pub mod error;
+pub mod expression;
 pub mod field;
+pub mod function;
 pub mod generics;
+pub mod impl_block;
 pub mod item;
 pub mod newtype;
 pub mod path;
+pub mod pattern;
 pub mod structure;
 pub mod type_reference;
 pub mod visibility;
@@ -36,11 +40,18 @@ pub use attribute::{
 pub use domain::CoreLogosDomain;
 pub use enumeration::{Enumeration, Variant, VariantPayload};
 pub use error::Error;
+pub use expression::{
+    Call, Callee, Expression, Match, MatchArm, MethodCall, QualifiedPath, ReferenceExpression,
+    TupleFieldAccess,
+};
 pub use field::Field;
+pub use function::{Block, Function, Parameter, Receiver};
 pub use generics::{GenericParameter, Generics, LifetimeParameter, TypeParameter};
+pub use impl_block::ImplBlock;
 pub use item::CoreItem;
 pub use newtype::Newtype;
 pub use path::PathNode;
+pub use pattern::{Pattern, PatternElement, TupleVariantPattern};
 pub use structure::Struct;
-pub use type_reference::{TypeApplication, TypeReference};
+pub use type_reference::{ImplTraitType, ReferenceType, TypeApplication, TypeReference};
 pub use visibility::Visibility;

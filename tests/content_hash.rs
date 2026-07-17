@@ -31,14 +31,12 @@ fn a_rename_leaves_core_identity_unchanged() {
     let item = support::commit_sequence(&mut names);
     let before = item.content_identity().expect("hash before rename");
 
-    let renamed = rename(&names, item.name(), "Commitment");
+    let name = item.name().expect("a newtype has a declared name");
+    let renamed = rename(&names, name, "Commitment");
 
     // The projected name genuinely moved between the two tables.
-    assert_eq!(
-        names.resolve(item.name()).unwrap().as_str(),
-        "CommitSequence"
-    );
-    assert_eq!(renamed.resolve(item.name()).unwrap().as_str(), "Commitment");
+    assert_eq!(names.resolve(name).unwrap().as_str(), "CommitSequence");
+    assert_eq!(renamed.resolve(name).unwrap().as_str(), "Commitment");
 
     // The Core value is untouched (it carries the identifier, never the string), so
     // its content identity does not move — the NameTable is excluded from the hash.
@@ -56,7 +54,9 @@ fn a_structural_edit_moves_core_identity() {
     let edited = CoreItem::Newtype(Newtype {
         visibility: Visibility::Public,
         attributes: support::golden_preamble(&mut names),
-        name: integer_wrapped.name(),
+        name: integer_wrapped
+            .name()
+            .expect("a newtype has a declared name"),
         wrapped: TypeReference::Path(support::path(&mut names, &["Boolean"])),
     });
     let after = edited.content_identity().expect("hash");

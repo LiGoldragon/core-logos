@@ -50,7 +50,10 @@ fn a_logos_item_built_over_the_extended_table_is_content_addressable() {
     item.content_identity()
         .expect("content identity over the extended table");
     assert_eq!(
-        logos.resolve(item.name()).unwrap().as_str(),
+        logos
+            .resolve(item.name().expect("a newtype has a declared name"))
+            .unwrap()
+            .as_str(),
         "CommitSequence"
     );
 }
