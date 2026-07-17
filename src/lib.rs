@@ -60,7 +60,8 @@ pub use path::PathNode;
 pub use pattern::{Pattern, PatternElement, TupleVariantPattern};
 pub use structure::Struct;
 pub use type_reference::{
-    ImplTraitType, ReferenceMutability, ReferenceType, SliceType, TypeApplication, TypeReference,
+    ImplTraitType, ReferenceMutability, ReferenceType, SliceType, TupleType, TypeApplication,
+    TypeReference,
 };
 pub use use_import::Use;
 pub use visibility::Visibility;

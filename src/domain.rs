@@ -18,8 +18,9 @@ impl HashDomain for CoreLogosDomain {
             // body's tail), `Call` gained `type_arguments: Vec<TypeReference>` (the
             // turbofish in `rkyv::to_bytes::<E>(self)`), the `Expression` algebra grew
             // the `Try` / `Closure` / `Tuple` / `Index` / `Range` nodes the frame
-            // encode/decode bodies exercise, and `Pattern` grew the `Wildcard` arm the
-            // open-`u64`-header match needs. rkyv archives a struct as the
+            // encode/decode bodies exercise, `TypeReference` grew the `Tuple` type (the
+            // `(InputRoute, Self)` decode return), and `Pattern` grew the `Wildcard` arm
+            // the open-`u64`-header match needs. rkyv archives a struct as the
             // concatenation of its fields and an enum sized to its largest variant, so
             // this growth enlarges every `CoreItem` value's archived bytes; the bump is
             // deliberate and honest, exactly as the truthful rule demands.

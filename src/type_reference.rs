@@ -23,6 +23,11 @@ pub enum TypeReference {
     /// A slice type `[<element>]`: `[&'static str]`. The `[…]` delimiter is a
     /// projection concern; the element is a stored type.
     Slice(SliceType),
+    /// A tuple type `(<elements>)`: the `(InputRoute, Self)` of the
+    /// `decode_signal_frame` return `Result<(InputRoute, Self), SignalFrameError>`.
+    /// The `(…)` delimiter is a projection concern; the elements are stored types. A
+    /// legitimate function return/parameter position, never a wire-data field.
+    Tuple(TupleType),
     /// A lifetime in a generic-argument list: the `'_` of `Formatter<'_>` or an
     /// explicit `'static`. Stored as the interned lifetime name (`_`, `static`),
     /// projected as `'<name>`. Legitimate only as a generic argument.
@@ -89,6 +94,19 @@ pub enum ReferenceMutability {
 pub struct SliceType {
     #[rkyv(omit_bounds)]
     pub element: Box<TypeReference>,
+}
+
+/// A tuple type `(<elements>)`: `(InputRoute, Self)`. Recursive through `elements`,
+/// so the rkyv bounds are stated with `omit_bounds` on the recursive field.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
+pub struct TupleType {
+    #[rkyv(omit_bounds)]
+    pub elements: Vec<TypeReference>,
 }
 
 /// An `impl Trait` type in a function signature: `impl Into<String>`. The bounds are
