@@ -13,28 +13,28 @@ impl HashDomain for CoreLogosDomain {
     fn separation() -> DomainSeparation {
         DomainSeparation::Contextual {
             context: "core-logos 2026 stringless core algebra of logos",
-            // Layout 3 covers the class-B/C/D kernel extension. rkyv archives an
-            // enum at a fixed size equal to its largest variant and hashes blake3
-            // over the full archived root, so growing the vocabulary moved every
-            // `CoreItem` value's archived bytes and therefore its content identity.
-            // This bump is deliberate and honest, exactly as the truthful rule
-            // demands. The archived shape changed in three compounding ways:
-            //   * `CoreItem` gained the `Const` and `Module` variants (`Module`
-            //     carries `Vec<CoreItem>`, enlarging the fixed enum footprint);
-            //   * `ImplBlock` replaced `functions: Vec<Function>` with
-            //     `items: Vec<ImplItem>`, a new enum wrapping the member kinds;
-            //   * `Expression`, `TypeReference`, `ReferenceType`, and `MethodCall`
-            //     grew tail variants and fields (integer/array literals, slice and
-            //     lifetime types, reference mutability, method turbofish).
-            // All enum growth is append-only at the tail — no discriminant shifted —
-            // but append-only at the Rust-source level does NOT imply archived-byte
-            // stability under rkyv's fixed-size enum layout, so the version moves.
-            // Layout 2 hashed the pre-extension shape; layout 3 hashes the extended
-            // shape. Any future archived-representation change — max-variant growth,
+            // Layout 4 adds tuple-field visibility to the newtype form. `Newtype`
+            // gained a `wrapped_visibility: Visibility` field between `name` and
+            // `wrapped`, so the tuple field of a `pub`-field tuple struct
+            // (`TraceEvent(pub ObjectName)`) is stored data, never a projection-time
+            // guess. rkyv archives a struct as the concatenation of its fields, so a
+            // new field enlarges every `Newtype` value's archived bytes — and,
+            // because `CoreItem` is a fixed-size enum sized to its largest variant,
+            // the archived bytes of every `CoreItem` value moved with it. This bump
+            // is deliberate and honest, exactly as the truthful rule demands.
+            //
+            // Layout history (each bump hashed a strictly larger archived shape):
+            //   * Layout 2 hashed the pre-extension shape;
+            //   * Layout 3 hashed the class-B/C/D kernel extension (the `Const` and
+            //     `Module` item kinds, `ImplBlock`'s `items: Vec<ImplItem>`, and the
+            //     expression/type tail growth);
+            //   * Layout 4 hashes the tuple-field-visibility extension.
+            //
+            // Any future archived-representation change — max-variant growth,
             // discriminant reordering, or field layout — moves hashes and demands a
             // deliberate bump, witnessed by the golden-hash constant in
             // `tests/content_hash_witness.rs`.
-            layout: LayoutVersion::new(3),
+            layout: LayoutVersion::new(4),
         }
     }
 }

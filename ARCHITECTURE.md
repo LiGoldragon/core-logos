@@ -43,8 +43,8 @@ the TextualRust sibling, not here.
 ## Content identity
 
 `CoreItem::content_identity` is `ContentHash::of_core` under `CoreLogosDomain`, a
-`Contextual` hash domain tagged with `LayoutVersion(3)` (see "Content identity and
-layout version" below for why layout 3). The pre-image is the value's canonical
+`Contextual` hash domain tagged with `LayoutVersion(4)` (see "Content identity and
+layout version" below for why layout 4). The pre-image is the value's canonical
 portable-archive bytes; the NameTable is excluded (it is not part of a Core value).
 Two invariants follow and are tested:
 
@@ -269,6 +269,26 @@ decide the short-header byte layout, which is a separate psyche-pending question
 (`.9`). Modeling a value as an `IntegerLiteral` says nothing about what that value
 *should* be — a later layout decision changes the golden and thus the transcribed
 data, with no change to this vocabulary.
+
+### Layout 4: tuple-field visibility
+
+**The layout is now 4.** The newtype form gained tuple-field visibility: `Newtype`
+carries a `wrapped_visibility: Visibility` between `name` and `wrapped`, so the
+single tuple field of a `pub`-field tuple struct (`TraceEvent(pub ObjectName)`) is
+stored data exactly as visibility is at the item level and the named-field level.
+This closes the last class-D gap — the trace goldens declare
+`pub struct TraceEvent(pub ObjectName);`, whose `pub` field the layout-3 `Newtype`
+could not model, so the declaration was not byte-exact-projectable. `Private`
+projects to the empty token stream, so a bare newtype (`CommitSequence(Integer)`)
+stores `Private` and projects unchanged — the "no `pub` on the field" special case
+dissolves into the normal case. rkyv archives a struct as the concatenation of its
+fields, so the new field enlarged every `Newtype` value's archived bytes and, because
+`CoreItem` is a fixed-size enum sized to its largest variant, moved every
+`CoreItem` value's archived bytes. `LayoutVersion(3)` hashed the class-B/C/D shape;
+**`LayoutVersion(4)` hashes the tuple-field-visibility shape**, and
+`tests/content_hash_witness.rs` pins the new absolute hash deliberately. Consumers
+(the signal-sema-storage seam) cross this hash boundary and must re-converge across
+layout 4 only via the deliberate cascade slice, never casually.
 
 ## Release-train status
 

@@ -57,6 +57,7 @@ fn a_structural_edit_moves_core_identity() {
         name: integer_wrapped
             .name()
             .expect("a newtype has a declared name"),
+        wrapped_visibility: Visibility::Private,
         wrapped: TypeReference::Path(support::path(&mut names, &["Boolean"])),
     });
     let after = edited.content_identity().expect("hash");
@@ -79,6 +80,24 @@ fn a_visibility_edit_moves_core_identity() {
         panic!("newtype");
     };
     newtype.visibility = Visibility::Crate;
+    let after = CoreItem::Newtype(newtype).content_identity().expect("hash");
+
+    assert_ne!(before.bytes(), after.bytes());
+}
+
+#[test]
+fn a_tuple_field_visibility_edit_moves_core_identity() {
+    let mut names = NameTable::new();
+    let private_field = support::commit_sequence(&mut names);
+    let before = private_field.content_identity().expect("hash");
+
+    // The tuple field's own visibility is stored data exactly as the item's is:
+    // promoting `CommitSequence(Integer)` to `CommitSequence(pub Integer)` is a
+    // structural edit, so the Core value's identity moves.
+    let CoreItem::Newtype(mut newtype) = private_field.clone() else {
+        panic!("newtype");
+    };
+    newtype.wrapped_visibility = Visibility::Public;
     let after = CoreItem::Newtype(newtype).content_identity().expect("hash");
 
     assert_ne!(before.bytes(), after.bytes());

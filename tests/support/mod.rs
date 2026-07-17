@@ -63,6 +63,7 @@ pub fn commit_sequence(names: &mut NameTable) -> CoreItem {
         visibility: Visibility::Public,
         attributes,
         name,
+        wrapped_visibility: Visibility::Private,
         wrapped,
     })
 }
