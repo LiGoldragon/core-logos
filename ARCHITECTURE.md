@@ -43,8 +43,8 @@ the TextualRust sibling, not here.
 ## Content identity
 
 `CoreItem::content_identity` is `ContentHash::of_core` under `CoreLogosDomain`, a
-`Contextual` hash domain tagged with `LayoutVersion(2)` (see "Content identity and
-layout version" below for why layout 2). The pre-image is the value's canonical
+`Contextual` hash domain tagged with `LayoutVersion(3)` (see "Content identity and
+layout version" below for why layout 3). The pre-image is the value's canonical
 portable-archive bytes; the NameTable is excluded (it is not part of a Core value).
 Two invariants follow and are tested:
 
@@ -67,10 +67,21 @@ The accepted Rust-lowering ontology (`reports/logos/logos-rust-lowering-v1.md`)
 names seven item kinds: `Newtype`, `Struct`, `Enumeration`, `Alias`,
 `TraitDefinition`, `ImplBlock`, `FreeMethod`. This crate carries the
 **wire-contract data subset** — `Newtype`, `Struct`, `Enumeration`, `Alias`, plus
-the leaf vocabulary (attributes, visibility, paths, generics by kind) — **and now
+the leaf vocabulary (attributes, visibility, paths, generics by kind) — **and
 `ImplBlock` and `Function`** (the ontology's `FreeMethod`, modeled as one node that
-serves both an impl member and a free function) **and `Use`** (the `use`-import
-shape at the head of every generated module).
+serves both an impl member and a free function), **`Use`** (the `use`-import
+shape at the head of every generated module), and — from the layout-3 kernel
+extension — **`Const` and `Module`** (a const declaration and a const-carrying
+inline module, the class-C stub items the signal goldens emit).
+
+An `ImplBlock`'s members are the ordered heterogeneous `ImplItem` set — a `Method`,
+an `AssociatedType` (`type Err = NotaDecodeError;`), or an `AssociatedConst`
+(`const HEADS: &'static [&'static str] = &[…];`) — in source order, so a `type`
+binding that precedes its method round-trips in place. `Const` is one node shared by
+a top-level const, a module const, and an associated const, because they are one
+concept; its visibility is stored data (a trait-impl associated const stores
+`Private`). `Module` carries a `Vec<CoreItem>`; the witnessed shape is the
+`short_header` const module.
 
 `Use` is a `<attrs> <vis> use <base>::{<group>};` node: a base path and an ordered
 group of imported leaf identifiers, stored as data. It carries the fixed cfg-gated
@@ -91,8 +102,10 @@ string:
 - a call of a plain or trait-qualified path callee — `Self(payload.into())`,
   `Self::new(payload)`, `Self::Record(payload)`, `RecordIdentifier::new(payload)`,
   `<Self as Trait>::method(self)`;
-- a method call — `payload.into()`, `self.0.name()`;
-- a string literal — `"SignalInputRecord"`;
+- a method call, with an optional turbofish — `payload.into()`, `self.0.name()`,
+  `source.parse::<Self>()`;
+- a string literal — `"SignalInputRecord"`; an integer literal — `0x0001000000000000`,
+  `8`; an array literal — `["Record", "Observe"]`;
 - a `match` over a scrutinee whose arms map a variant pattern (a unit-like path
   `InputRoute::Record`, or a tuple variant `Self::Record(_)` / `Self::Input(route)`)
   to a body expression (a unit path, a string literal, or a nested match).
@@ -102,12 +115,14 @@ no statements, so no `let`/`return` statement vocabulary is modeled. Matches are
 exhaustive with no wildcard arm; the whole vocabulary is closed and dispatches on
 node kind, never on a head string.
 
-`TraitDefinition` remains **left out**: its method signatures are in-subset shape
-but its associated types and default bodies would need more than the Tier-1
-vocabulary. Class-B bodies (`let` bindings, early `return`, struct-literal
-construction `Self { … }`, named field access, `&mut`, closures) are the honest
-frontier beyond Tier-1; a body carrying them is not modeled and the TextualRust
-reader rejects it loudly. Const generic parameters remain excluded (unwitnessed).
+`TraitDefinition` as a top-level item remains **left out**: a trait declaration's
+default bodies and member declarations are a separate growth. (Associated types and
+consts are now modeled **inside impl blocks**, where the goldens carry them.)
+Class-B *statement* bodies (`let` bindings, early `return`, struct-literal
+construction `Self { … }`, named field access, closures) are the honest frontier
+beyond the single-tail-expression body; a body carrying them is not modeled and the
+TextualRust reader rejects it loudly. Const generic parameters remain excluded
+(unwitnessed).
 
 Totality is structural: `CoreItem`'s methods match every variant with no wildcard
 arm, so a new item kind is a compile error until its handling is written. An impl
@@ -130,9 +145,31 @@ Every choice below the psyche rulings is a revisable lean with a stated trigger:
   carries a `String`. This is the one place a Core value holds owned text, and it is
   literal-value data, not the raw-token-text escape hatch the text-free boundary
   forbids. *Trigger:* if a projection ever needs to intern literal content, revisit.
-- **Shared references only.** `&mut` (exclusive borrow, `&mut self`) is unwitnessed
-  in Tier-1 bodies, so `ReferenceType` and `Receiver` model only the shared form.
-  *Trigger:* a witnessed Tier-1 signature borrows mutably.
+- **Reference mutability is modeled; `&mut self` is not.** The layout-3 growth added
+  `&mut` to `ReferenceType` (a stored `ReferenceMutability` kind) because the
+  witnessed `Display::fmt` signature borrows the formatter mutably
+  (`&mut std::fmt::Formatter<'_>`) — the trigger fired. The `Receiver` still models
+  only `self`/`&self`; a `&mut self` receiver stays unwitnessed. *Trigger:* a
+  witnessed Tier-1 body takes `&mut self`.
+- **Integer literals are value-plus-representation, never stored text.** An
+  `IntegerLiteral` carries a `u128` value and a closed `IntegerRepresentation`
+  (`Decimal`, or `Hexadecimal { minimum_digits }` for the zero-padded `0x…` form),
+  so `0x0001000000000000` round-trips byte-exact without the Core holding raw token
+  text — the stringless boundary holds and the string-literal exception below stays
+  the *only* owned-text field. The hexadecimal form is **lowercase** (the goldens'
+  digits are `0`/`1`, case-agnostic). *Trigger:* a witnessed literal needs uppercase
+  hex, a digit separator, a suffix, or a non-decimal/non-hex radix.
+- **Const modules carry consts only.** `Module` models the witnessed `short_header`
+  shape — an inline module whose members are `Const`s. A module carrying an enum,
+  impl, or other item is a broader growth point (it re-exposes the derive-group
+  trailing-comma layout that a context-free `DeriveGroup` does not yet carry
+  faithfully). *Trigger:* a witnessed module needs a non-const member — model it
+  together with a trailing-comma-faithful `DeriveGroup` then.
+- **Slice and lifetime types, in position.** `TypeReference::Slice` (`[&'static str]`)
+  and `TypeReference::Lifetime` (the `'_` of `Formatter<'_>`) join `Reference` and
+  `ImplTrait` as the signature/const-type and generic-argument shapes — legitimate
+  by position, never in wire-data field position. *Trigger:* a witnessed shape needs
+  another positioned type kind.
 - **Tuple-index field access only.** Named field access (`self.origin_route`) is
   unwitnessed in a fully-Tier-1 body (the impls that use it carry class-B struct
   literals and are rejected whole). *Trigger:* a fully-Tier-1 body accesses a named
@@ -205,6 +242,33 @@ survey at the time of this correction confirmed **no durable store or fixture ho
 persisted CoreLogos hashes** (everything recomputes, or is tempdir-ephemeral), so
 this correction needs no data migration — but the boundary is real, and a consumer
 must advance across it only via the deliberate cascade slice, never casually.
+
+### Layout 3: the class-B/C/D kernel extension
+
+**The layout is now 3.** The class-B/C/D kernel extension grew the vocabulary to
+cover the goldens' interface-enum ergonomics (constructor and `From` impls, the
+cfg-gated `FromStr`/`Display` impls with their associated types and mutable-formatter
+signatures), the trace/object-name enums with nested-match `name` methods, and the
+class-C stub items (const, const module, associated const). That growth moved the
+archived representation in three compounding ways — `CoreItem` gained `Const` and
+`Module` (the latter carrying `Vec<CoreItem>`); `ImplBlock` replaced its
+`Vec<Function>` with a `Vec<ImplItem>`; and `Expression`, `TypeReference`,
+`ReferenceType`, and `MethodCall` grew tail variants and fields. All enum growth is
+**append-only at the tail** (no discriminant shifted), but by the truthful rule that
+does not imply archived-byte stability under rkyv's fixed-size enum layout, so the
+version moves. `LayoutVersion(2)` hashed the pre-extension shape; **`LayoutVersion(3)`
+hashes the extended shape**, and `tests/content_hash_witness.rs` pins the new
+absolute hash deliberately. Consumers (the signal-sema-storage seam) cross this hash
+boundary and must re-converge across layout 3 only via the deliberate cascade slice.
+
+**The short-header const *values* are modeled as data, not re-decided.** The
+`short_header` module's `0x…` const values (`INPUT_RECORD`, `INPUT_OBSERVE`, …) are
+transcribed from the golden's existing text into `IntegerLiteral` value-plus-
+representation data. This crate **models the golden's existing bytes**; it does not
+decide the short-header byte layout, which is a separate psyche-pending question
+(`.9`). Modeling a value as an `IntegerLiteral` says nothing about what that value
+*should* be — a later layout decision changes the golden and thus the transcribed
+data, with no change to this vocabulary.
 
 ## Release-train status
 

@@ -2,11 +2,13 @@
 
 use crate::alias::Alias;
 use crate::attribute::Attribute;
+use crate::const_item::Const;
 use crate::domain::CoreLogosDomain;
 use crate::enumeration::Enumeration;
 use crate::error::Error;
 use crate::function::Function;
 use crate::impl_block::ImplBlock;
+use crate::module::Module;
 use crate::newtype::Newtype;
 use crate::structure::Struct;
 use crate::use_import::Use;
@@ -34,6 +36,8 @@ pub enum CoreItem {
     ImplBlock(ImplBlock),
     Function(Function),
     Use(Use),
+    Const(Const),
+    Module(Module),
 }
 
 impl CoreItem {
@@ -49,6 +53,8 @@ impl CoreItem {
             CoreItem::Enumeration(enumeration) => Some(enumeration.name),
             CoreItem::Alias(alias) => Some(alias.name),
             CoreItem::Function(function) => Some(function.name),
+            CoreItem::Const(const_item) => Some(const_item.name),
+            CoreItem::Module(module) => Some(module.name),
             CoreItem::ImplBlock(_) => None,
             // A use import declares no name — it brings names in, it does not
             // declare one — so it dissolves into the same `None` as an impl block.
@@ -70,6 +76,8 @@ impl CoreItem {
             CoreItem::Enumeration(enumeration) => enumeration.visibility = visibility,
             CoreItem::Alias(alias) => alias.visibility = visibility,
             CoreItem::Function(function) => function.visibility = visibility,
+            CoreItem::Const(const_item) => const_item.visibility = visibility,
+            CoreItem::Module(module) => module.visibility = visibility,
             CoreItem::ImplBlock(_) => {}
             // A use import carries its own visibility (`pub use`), so it is stamped
             // like any other visible item.
@@ -89,6 +97,8 @@ impl CoreItem {
             CoreItem::ImplBlock(impl_block) => &impl_block.attributes,
             CoreItem::Function(function) => &function.attributes,
             CoreItem::Use(use_import) => &use_import.attributes,
+            CoreItem::Const(const_item) => &const_item.attributes,
+            CoreItem::Module(module) => &module.attributes,
         }
     }
 

@@ -6,8 +6,9 @@ mod support;
 
 use content_identity::PortableArchive;
 use core_logos::{
-    Block, Call, Callee, CoreItem, Expression, Function, ImplBlock, MethodCall, Parameter,
-    ReferenceExpression, TupleFieldAccess, TypeReference, Visibility,
+    Block, Call, Callee, CoreItem, Expression, Function, ImplBlock, ImplItem, MethodCall,
+    Parameter, ReferenceExpression, ReferenceMutability, TupleFieldAccess, TypeReference,
+    Visibility,
 };
 use name_table::NameTable;
 
@@ -50,6 +51,7 @@ fn topic_impl(names: &mut NameTable) -> CoreItem {
                         segments: vec![payload],
                     })),
                     method: into,
+                    type_arguments: Vec::new(),
                     arguments: Vec::new(),
                 })],
             }),
@@ -65,6 +67,7 @@ fn topic_impl(names: &mut NameTable) -> CoreItem {
         parameters: Vec::new(),
         return_type: Some(TypeReference::Reference(core_logos::ReferenceType {
             lifetime: None,
+            mutability: ReferenceMutability::Shared,
             referent: Box::new(TypeReference::Path(support::path(names, &["String"]))),
         })),
         body: Block {
@@ -103,7 +106,11 @@ fn topic_impl(names: &mut NameTable) -> CoreItem {
         generics: core_logos::Generics::none(),
         implemented_trait: None,
         self_type: TypeReference::Path(support::path(names, &["Topic"])),
-        functions: vec![new, payload_getter, into_payload],
+        items: vec![
+            ImplItem::Method(new),
+            ImplItem::Method(payload_getter),
+            ImplItem::Method(into_payload),
+        ],
     })
 }
 
@@ -137,7 +144,10 @@ fn editing_a_body_expression_moves_the_impl_block_identity() {
     let CoreItem::ImplBlock(mut impl_block) = item else {
         panic!("impl block");
     };
-    impl_block.functions[2].body.tail_expression = Expression::Field(TupleFieldAccess {
+    let ImplItem::Method(into_payload) = &mut impl_block.items[2] else {
+        panic!("the third member is the into_payload method");
+    };
+    into_payload.body.tail_expression = Expression::Field(TupleFieldAccess {
         base: Box::new(Expression::Receiver),
         index: 1,
     });

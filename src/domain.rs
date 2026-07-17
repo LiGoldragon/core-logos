@@ -13,20 +13,28 @@ impl HashDomain for CoreLogosDomain {
     fn separation() -> DomainSeparation {
         DomainSeparation::Contextual {
             context: "core-logos 2026 stringless core algebra of logos",
-            // Layout 2 covers the shipped archived-shape change. rkyv archives an
-            // enum at a fixed size equal to its largest variant, so adding the
-            // `Function` item kind (commit be809429) grew `ArchivedCoreItem`'s max
-            // size from 47 to 101 bytes: EVERY `CoreItem` value — including
-            // pre-existing shapes untouched at the Rust-source level — now
-            // re-serializes larger, and its content identity (blake3 over the full
-            // archived root) moved. Append-only enum growth at the Rust-source level
-            // does NOT imply archived-byte stability under rkyv's fixed-size enum
-            // layout. Layout 1 hashed the pre-be809429 shape; layout 2 hashes the
-            // shipped shape. Any future change to the archived representation —
-            // max-variant growth, discriminant reordering, or field layout — moves
-            // hashes and demands a deliberate bump, witnessed by the golden-hash
-            // constant in `tests/content_hash.rs`.
-            layout: LayoutVersion::new(2),
+            // Layout 3 covers the class-B/C/D kernel extension. rkyv archives an
+            // enum at a fixed size equal to its largest variant and hashes blake3
+            // over the full archived root, so growing the vocabulary moved every
+            // `CoreItem` value's archived bytes and therefore its content identity.
+            // This bump is deliberate and honest, exactly as the truthful rule
+            // demands. The archived shape changed in three compounding ways:
+            //   * `CoreItem` gained the `Const` and `Module` variants (`Module`
+            //     carries `Vec<CoreItem>`, enlarging the fixed enum footprint);
+            //   * `ImplBlock` replaced `functions: Vec<Function>` with
+            //     `items: Vec<ImplItem>`, a new enum wrapping the member kinds;
+            //   * `Expression`, `TypeReference`, `ReferenceType`, and `MethodCall`
+            //     grew tail variants and fields (integer/array literals, slice and
+            //     lifetime types, reference mutability, method turbofish).
+            // All enum growth is append-only at the tail — no discriminant shifted —
+            // but append-only at the Rust-source level does NOT imply archived-byte
+            // stability under rkyv's fixed-size enum layout, so the version moves.
+            // Layout 2 hashed the pre-extension shape; layout 3 hashes the extended
+            // shape. Any future archived-representation change — max-variant growth,
+            // discriminant reordering, or field layout — moves hashes and demands a
+            // deliberate bump, witnessed by the golden-hash constant in
+            // `tests/content_hash_witness.rs`.
+            layout: LayoutVersion::new(3),
         }
     }
 }

@@ -17,6 +17,7 @@
 
 pub mod alias;
 pub mod attribute;
+pub mod const_item;
 pub mod domain;
 pub mod enumeration;
 pub mod error;
@@ -26,6 +27,7 @@ pub mod function;
 pub mod generics;
 pub mod impl_block;
 pub mod item;
+pub mod module;
 pub mod newtype;
 pub mod path;
 pub mod pattern;
@@ -38,22 +40,26 @@ pub use alias::Alias;
 pub use attribute::{
     Attribute, ConfigurationAttribute, ConfigurationPredicate, DeriveGroup, HelperDerive,
 };
+pub use const_item::Const;
 pub use domain::CoreLogosDomain;
 pub use enumeration::{Enumeration, Variant, VariantPayload};
 pub use error::Error;
 pub use expression::{
-    Call, Callee, Expression, Match, MatchArm, MethodCall, QualifiedPath, ReferenceExpression,
-    TupleFieldAccess,
+    ArrayExpression, Call, Callee, Expression, IntegerLiteral, IntegerRepresentation, Match,
+    MatchArm, MethodCall, QualifiedPath, ReferenceExpression, TupleFieldAccess,
 };
 pub use field::Field;
 pub use function::{Block, Function, Parameter, Receiver};
 pub use generics::{GenericParameter, Generics, LifetimeParameter, TypeParameter};
-pub use impl_block::ImplBlock;
+pub use impl_block::{AssociatedType, ImplBlock, ImplItem};
 pub use item::CoreItem;
+pub use module::Module;
 pub use newtype::Newtype;
 pub use path::PathNode;
 pub use pattern::{Pattern, PatternElement, TupleVariantPattern};
 pub use structure::Struct;
-pub use type_reference::{ImplTraitType, ReferenceType, TypeApplication, TypeReference};
+pub use type_reference::{
+    ImplTraitType, ReferenceMutability, ReferenceType, SliceType, TypeApplication, TypeReference,
+};
 pub use use_import::Use;
 pub use visibility::Visibility;

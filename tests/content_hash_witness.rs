@@ -18,18 +18,18 @@
 
 mod support;
 
-use core_logos::CoreLogosDomain;
 use content_identity::HashDomain;
+use core_logos::CoreLogosDomain;
 use name_table::NameTable;
 
 /// The content identity of the `CommitSequence` golden newtype under the current
-/// CoreLogos layout, as a lowercase hex blake3 digest. Pinned at layout 2, the
-/// version that hashes the shipped archived shape (post-be809429). The value is a
-/// deterministic function of the golden fixture: `commit_sequence` interns into a
+/// CoreLogos layout, as a lowercase hex blake3 digest. Pinned at layout 3, the
+/// version that hashes the class-B/C/D kernel-extension archived shape. The value is
+/// a deterministic function of the golden fixture: `commit_sequence` interns into a
 /// fresh NameTable in a fixed order, so the stored identifier indices — and thus the
 /// archived bytes — are reproducible.
-const COMMIT_SEQUENCE_IDENTITY_LAYOUT_2: &str =
-    "29c313bf0336b204dbdccba9d6b20cc466cc72ed331285530fdeeee630a5277e";
+const COMMIT_SEQUENCE_IDENTITY_LAYOUT_3: &str =
+    "24476e54f60d5ee7f0a7c3cec12cf70fac2681ee729d15adcb70ef1094e9ae25";
 
 #[test]
 fn commit_sequence_identity_is_pinned_under_the_current_layout() {
@@ -38,7 +38,7 @@ fn commit_sequence_identity_is_pinned_under_the_current_layout() {
     // definition and must be re-derived deliberately.
     assert_eq!(
         CoreLogosDomain::layout_version().value(),
-        2,
+        3,
         "the witnessed layout version moved; re-derive the pinned hash deliberately",
     );
 
@@ -48,7 +48,7 @@ fn commit_sequence_identity_is_pinned_under_the_current_layout() {
 
     assert_eq!(
         identity.to_hexadecimal(),
-        COMMIT_SEQUENCE_IDENTITY_LAYOUT_2,
+        COMMIT_SEQUENCE_IDENTITY_LAYOUT_3,
         "the archived representation of CommitSequence changed — this is a layout \
          event: bump CoreLogosDomain's LayoutVersion in src/domain.rs, document why \
          the archived shape moved, and update this constant deliberately",

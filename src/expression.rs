@@ -15,8 +15,11 @@
 //! - `Self(payload.into())`, `Self::new(payload)`, `Self::Record(payload)`,
 //!   `RecordIdentifier::new(payload)`, `<Self as Trait>::method(self)` →
 //!   [`Expression::Call`] (the callee is a plain or qualified path)
-//! - `payload.into()`, `self.0.name()` → [`Expression::MethodCall`]
+//! - `payload.into()`, `self.0.name()`, `NotaSource::new(source).parse::<Self>()` →
+//!   [`Expression::MethodCall`] (the trailing `::<Self>` is a stored turbofish)
 //! - `"SignalInputRecord"` → [`Expression::StringLiteral`]
+//! - `0x0001000000000000`, `8` → [`Expression::IntegerLiteral`]
+//! - `["Record", "Observe"]` → [`Expression::Array`]
 //! - `match self { … }` → [`Expression::Match`]
 //!
 //! Every recursive slot is behind a struct that carries the rkyv self-referential
@@ -53,6 +56,14 @@ pub enum Expression {
     MethodCall(MethodCall),
     /// A `match <scrutinee> { <arms> }` expression.
     Match(Match),
+    /// An integer literal: `0x0001000000000000`, `8`. Stringless — the value is a
+    /// number and the surface form (decimal or zero-padded hexadecimal) is a closed
+    /// [`IntegerRepresentation`] descriptor, never stored text. The value is literal
+    /// data hashed into content identity, exactly like a string literal's content.
+    IntegerLiteral(IntegerLiteral),
+    /// An array literal: `["Record", "Observe"]`. The `[…]` delimiter and the `, `
+    /// separators are projection concerns; the elements are stored expressions.
+    Array(ArrayExpression),
 }
 
 /// A shared-reference expression `&<referent>`. Recursion through `referent` carries
@@ -116,9 +127,10 @@ pub struct QualifiedPath {
     pub member: Vec<Identifier>,
 }
 
-/// A method call `<receiver>.<method>(<arguments>)`: `payload.into()`,
-/// `self.0.name()`. Recursion through `receiver` and `arguments` carries the rkyv
-/// self-referential bounds.
+/// A method call `<receiver>.<method><turbofish>(<arguments>)`: `payload.into()`,
+/// `self.0.name()`, `source.parse::<Self>()`. The `type_arguments` are the optional
+/// turbofish (`::<Self>`); an empty vector is the un-turbofished call. Recursion
+/// through `receiver` and `arguments` carries the rkyv self-referential bounds.
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
 #[rkyv(
     serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
@@ -129,6 +141,7 @@ pub struct MethodCall {
     #[rkyv(omit_bounds)]
     pub receiver: Box<Expression>,
     pub method: Identifier,
+    pub type_arguments: Vec<TypeReference>,
     #[rkyv(omit_bounds)]
     pub arguments: Vec<Expression>,
 }
@@ -162,4 +175,43 @@ pub struct MatchArm {
     pub pattern: Pattern,
     #[rkyv(omit_bounds)]
     pub body: Expression,
+}
+
+/// An integer literal as stringless data: a numeric value and a closed surface-form
+/// descriptor. The value carries the semantics (hashed into content identity like a
+/// string literal's content); the representation carries the exact Rust text the
+/// value projects to, so `0x0001000000000000` and `281474976710656` are the same
+/// value under different [`IntegerRepresentation`]s and each round-trips byte-exact
+/// without the Core ever holding raw token text.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+pub struct IntegerLiteral {
+    pub value: u128,
+    pub representation: IntegerRepresentation,
+}
+
+/// The closed surface form of an integer literal. `Decimal` is the plain form (`8`);
+/// `Hexadecimal` is the `0x`-prefixed form whose `minimum_digits` records the
+/// zero-padding width (`0x0001000000000000` is `minimum_digits: 16`). This is a
+/// closed formatting descriptor, not stored text — the stringless boundary holds.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+pub enum IntegerRepresentation {
+    /// The plain decimal form: `8`, `281474976710656`.
+    Decimal,
+    /// The lowercase `0x`-prefixed hexadecimal form, zero-padded to `minimum_digits`:
+    /// `0x0001000000000000`.
+    Hexadecimal { minimum_digits: u16 },
+}
+
+/// An array literal `[<elements>]`: `["Record", "Observe"]`. Recursion through
+/// `elements` carries the rkyv self-referential bounds, mirroring the other
+/// expression slots.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
+pub struct ArrayExpression {
+    #[rkyv(omit_bounds)]
+    pub elements: Vec<Expression>,
 }
