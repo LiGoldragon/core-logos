@@ -44,11 +44,65 @@ pub struct Parameter {
     pub type_reference: TypeReference,
 }
 
-/// A function body: a single tail expression. The `{ }` block delimiter is a
-/// projection concern. Statements (`let`, early `return`) are out of the Tier-1
-/// vocabulary — the witnessed Tier-1 bodies are exactly one tail expression — so the
-/// reader rejects a multi-statement body loudly.
+/// A function body: an ordered run of statements followed by a tail expression. The
+/// `{ }` block delimiter and the statement `;` separators are projection concerns.
+/// A body with no statements is the single-tail-expression form the class-A/kin
+/// bodies use; the codec bodies (`encode_signal_frame` / `decode_signal_frame`) carry
+/// `let` bindings ahead of the tail. Recursion through the statements and the tail
+/// carries the rkyv self-referential bounds.
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
 pub struct Block {
+    #[rkyv(omit_bounds)]
+    pub statements: Vec<Statement>,
+    #[rkyv(omit_bounds)]
     pub tail_expression: Expression,
+}
+
+/// One statement of a block, dispatched by kind. A `let` binding introduces a local;
+/// an expression statement evaluates an expression for its effect
+/// (`frame.extend_from_slice(&archive);`). Recursion carries the rkyv
+/// self-referential bounds.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
+pub enum Statement {
+    /// A `let <binding> <name> = <value>;` local binding.
+    Let(LetStatement),
+    /// An expression evaluated for effect, terminated by `;`.
+    Expression(#[rkyv(omit_bounds)] Expression),
+}
+
+/// A `let` binding: `let archive = …;`, `let mut frame = …;`. The mutability is a
+/// closed [`LetBinding`] kind rather than a boolean flag; the bound name is a stored
+/// identifier and the value is one expression. Recursion through `value` carries the
+/// rkyv self-referential bounds.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
+pub struct LetStatement {
+    pub binding: LetBinding,
+    pub name: Identifier,
+    #[rkyv(omit_bounds)]
+    pub value: Expression,
+}
+
+/// The mutability of a `let` binding, named rather than carried as a boolean flag:
+/// `let name` (immutable) versus `let mut name` (mutable).
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+pub enum LetBinding {
+    /// `let <name>` — an immutable binding.
+    Immutable,
+    /// `let mut <name>` — a mutable binding.
+    Mutable,
 }

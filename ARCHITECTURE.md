@@ -107,21 +107,30 @@ string:
 - a string literal — `"SignalInputRecord"`; an integer literal — `0x0001000000000000`,
   `8`; an array literal — `["Record", "Observe"]`;
 - a `match` over a scrutinee whose arms map a variant pattern (a unit-like path
-  `InputRoute::Record`, or a tuple variant `Self::Record(_)` / `Self::Input(route)`)
-  to a body expression (a unit path, a string literal, or a nested match).
+  `InputRoute::Record`, a tuple variant `Self::Record(_)` / `Self::Input(route)`, or
+  the wildcard `_` an open-`u64`-header match needs) to a body expression;
+- (layout 5, the **ordinary-exchange codec bodies**) a `?` try, a closure
+  `|_| SignalFrameError::ArchiveEncode`, a tuple `(route, value)`, an index
+  `frame[SIGNAL_SHORT_HEADER_BYTE_COUNT..]`, a half-open range `..n` / `n..`, and a
+  turbofished call `rkyv::to_bytes::<rkyv::rancor::Error>(self)`.
 
-Function bodies are a **single tail expression** — the witnessed Tier-1 bodies carry
-no statements, so no `let`/`return` statement vocabulary is modeled. Matches are
-exhaustive with no wildcard arm; the whole vocabulary is closed and dispatches on
+Function bodies are a run of **statements followed by a tail expression** (`Block`
+carries `statements: Vec<Statement>`): the class-A-and-kin bodies carry no statements
+(the single-tail-expression form), while the `encode_signal_frame` /
+`decode_signal_frame` codec bodies carry `let` / `let mut` bindings and
+expression-statements ahead of their tail. The `let` mutability is a closed
+[`LetBinding`] kind, not a boolean. The whole vocabulary is closed and dispatches on
 node kind, never on a head string.
 
 `TraitDefinition` as a top-level item remains **left out**: a trait declaration's
 default bodies and member declarations are a separate growth. (Associated types and
 consts are now modeled **inside impl blocks**, where the goldens carry them.)
-Class-B *statement* bodies (`let` bindings, early `return`, struct-literal
-construction `Self { … }`, named field access, closures) are the honest frontier
-beyond the single-tail-expression body; a body carrying them is not modeled and the
-TextualRust reader rejects it loudly. Const generic parameters remain excluded
+Struct-literal construction (`Self { … }`), named field access, and early `return`
+remain the honest frontier beyond the modeled statement vocabulary — the codec bodies
+are written in a style that dissolves them (an `.ok_or(…)?` in place of an
+`if … { return … }`, a tuple-variant error carrying `header` in place of a
+struct-variant literal), so they are not needed and a body demanding them is still
+rejected loudly by the TextualRust reader. Const generic parameters remain excluded
 (unwitnessed).
 
 Totality is structural: `CoreItem`'s methods match every variant with no wildcard

@@ -178,6 +178,7 @@ fn an_impl_block_carries_heterogeneous_members_in_order() {
         parameters: Vec::new(),
         return_type: None,
         body: Block {
+            statements: Vec::new(),
             tail_expression: Expression::Path(PathNode {
                 segments: vec![support::identifier(&mut names, "route")],
             }),

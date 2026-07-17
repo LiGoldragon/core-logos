@@ -45,11 +45,12 @@ pub use domain::CoreLogosDomain;
 pub use enumeration::{Enumeration, Variant, VariantPayload};
 pub use error::Error;
 pub use expression::{
-    ArrayExpression, Call, Callee, Expression, IntegerLiteral, IntegerRepresentation, Match,
-    MatchArm, MethodCall, QualifiedPath, ReferenceExpression, TupleFieldAccess,
+    ArrayExpression, Call, Callee, ClosureExpression, Expression, IndexExpression, IntegerLiteral,
+    IntegerRepresentation, Match, MatchArm, MethodCall, QualifiedPath, RangeExpression,
+    ReferenceExpression, TryExpression, TupleExpression, TupleFieldAccess,
 };
 pub use field::Field;
-pub use function::{Block, Function, Parameter, Receiver};
+pub use function::{Block, Function, LetBinding, LetStatement, Parameter, Receiver, Statement};
 pub use generics::{GenericParameter, Generics, LifetimeParameter, TypeParameter};
 pub use impl_block::{AssociatedType, ImplBlock, ImplItem};
 pub use item::CoreItem;

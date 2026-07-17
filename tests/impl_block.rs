@@ -43,9 +43,11 @@ fn topic_impl(names: &mut NameTable) -> CoreItem {
         }],
         return_type: Some(TypeReference::Path(self_path.clone())),
         body: Block {
+            statements: Vec::new(),
             // Self(payload.into())
             tail_expression: Expression::Call(Call {
                 callee: Callee::Path(self_path),
+                type_arguments: Vec::new(),
                 arguments: vec![Expression::MethodCall(MethodCall {
                     receiver: Box::new(Expression::Path(core_logos::PathNode {
                         segments: vec![payload],
@@ -71,6 +73,7 @@ fn topic_impl(names: &mut NameTable) -> CoreItem {
             referent: Box::new(TypeReference::Path(support::path(names, &["String"]))),
         })),
         body: Block {
+            statements: Vec::new(),
             // &self.0
             tail_expression: Expression::Reference(ReferenceExpression {
                 referent: Box::new(Expression::Field(TupleFieldAccess {
@@ -90,6 +93,7 @@ fn topic_impl(names: &mut NameTable) -> CoreItem {
         parameters: Vec::new(),
         return_type: Some(TypeReference::Path(support::path(names, &["String"]))),
         body: Block {
+            statements: Vec::new(),
             // self.0
             tail_expression: Expression::Field(TupleFieldAccess {
                 base: Box::new(Expression::Receiver),
@@ -181,6 +185,7 @@ fn a_free_function_is_a_named_content_addressable_item() {
         }],
         return_type: Some(TypeReference::Path(string)),
         body: Block {
+            statements: Vec::new(),
             // value
             tail_expression: Expression::Path(core_logos::PathNode {
                 segments: vec![value],

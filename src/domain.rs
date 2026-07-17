@@ -13,28 +13,30 @@ impl HashDomain for CoreLogosDomain {
     fn separation() -> DomainSeparation {
         DomainSeparation::Contextual {
             context: "core-logos 2026 stringless core algebra of logos",
-            // Layout 4 adds tuple-field visibility to the newtype form. `Newtype`
-            // gained a `wrapped_visibility: Visibility` field between `name` and
-            // `wrapped`, so the tuple field of a `pub`-field tuple struct
-            // (`TraceEvent(pub ObjectName)`) is stored data, never a projection-time
-            // guess. rkyv archives a struct as the concatenation of its fields, so a
-            // new field enlarges every `Newtype` value's archived bytes — and,
-            // because `CoreItem` is a fixed-size enum sized to its largest variant,
-            // the archived bytes of every `CoreItem` value moved with it. This bump
-            // is deliberate and honest, exactly as the truthful rule demands.
+            // Layout 5 adds the ordinary-exchange codec-body vocabulary. `Block`
+            // gained `statements: Vec<Statement>` (the `let` bindings ahead of a codec
+            // body's tail), `Call` gained `type_arguments: Vec<TypeReference>` (the
+            // turbofish in `rkyv::to_bytes::<E>(self)`), the `Expression` algebra grew
+            // the `Try` / `Closure` / `Tuple` / `Index` / `Range` nodes the frame
+            // encode/decode bodies exercise, and `Pattern` grew the `Wildcard` arm the
+            // open-`u64`-header match needs. rkyv archives a struct as the
+            // concatenation of its fields and an enum sized to its largest variant, so
+            // this growth enlarges every `CoreItem` value's archived bytes; the bump is
+            // deliberate and honest, exactly as the truthful rule demands.
             //
             // Layout history (each bump hashed a strictly larger archived shape):
             //   * Layout 2 hashed the pre-extension shape;
             //   * Layout 3 hashed the class-B/C/D kernel extension (the `Const` and
             //     `Module` item kinds, `ImplBlock`'s `items: Vec<ImplItem>`, and the
             //     expression/type tail growth);
-            //   * Layout 4 hashes the tuple-field-visibility extension.
+            //   * Layout 4 hashed the tuple-field-visibility extension;
+            //   * Layout 5 hashes the ordinary-exchange codec-body vocabulary.
             //
             // Any future archived-representation change — max-variant growth,
             // discriminant reordering, or field layout — moves hashes and demands a
             // deliberate bump, witnessed by the golden-hash constant in
             // `tests/content_hash_witness.rs`.
-            layout: LayoutVersion::new(4),
+            layout: LayoutVersion::new(5),
         }
     }
 }

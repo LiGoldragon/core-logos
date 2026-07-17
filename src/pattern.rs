@@ -1,8 +1,9 @@
 //! The closed Tier-1 pattern vocabulary of match arms.
 //!
 //! A Tier-1 match arm binds a variant pattern — either a unit-like path
-//! (`InputRoute::Record`) or a tuple-variant with per-element bindings
-//! (`Self::Record(_)`, `Self::Input(route)`). The set is closed: no wildcard arm, no
+//! (`InputRoute::Record`), a tuple-variant with per-element bindings
+//! (`Self::Record(_)`, `Self::Input(route)`), or the wildcard `_` catch-all that an
+//! open-scrutinee match (matching a `u64` header) needs. The set stays closed: no
 //! literal pattern, no struct pattern, no or-pattern. Dispatch is on the node's
 //! kind, never on a head string.
 
@@ -17,6 +18,11 @@ pub enum Pattern {
     /// A tuple-variant pattern binding or ignoring positional payloads:
     /// `Self::Record(_)`, `Self::Input(route)`.
     TupleVariant(TupleVariantPattern),
+    /// The wildcard arm `_` — the catch-all of an otherwise-exhaustive match, as in
+    /// the `_ => Err(SignalFrameError::UnknownHeader(header))` arm of
+    /// `route_from_short_header`, where the header space is open (`u64`) and the
+    /// enumerated arms cannot be exhaustive.
+    Wildcard,
 }
 
 /// A tuple-variant pattern: a variant path applied to positional element patterns.

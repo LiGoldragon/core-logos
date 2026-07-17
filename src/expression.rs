@@ -27,7 +27,7 @@
 //! the `Expression` enum itself needs no bounds attribute.
 
 use crate::path::PathNode;
-use crate::pattern::Pattern;
+use crate::pattern::{Pattern, PatternElement};
 use crate::type_reference::TypeReference;
 use name_table::Identifier;
 
@@ -64,6 +64,28 @@ pub enum Expression {
     /// An array literal: `["Record", "Observe"]`. The `[…]` delimiter and the `, `
     /// separators are projection concerns; the elements are stored expressions.
     Array(ArrayExpression),
+    /// The `?` try operator applied to a fallible expression:
+    /// `rkyv::to_bytes::<E>(self).map_err(…)?`. The postfix `?` is a projection
+    /// concern; the stored data is the inner fallible expression.
+    Try(TryExpression),
+    /// A closure `|<parameters>| <body>`: `|_| SignalFrameError::ArchiveEncode`. The
+    /// `|…|` delimiters are a projection concern; the parameters are the reused
+    /// tuple-element pattern vocabulary (a wildcard or a binding) and the body is one
+    /// stored expression.
+    Closure(ClosureExpression),
+    /// A tuple expression `(<elements>)`: `(route, value)`. The `(…)` delimiter and
+    /// separators are projection concerns; the elements are stored expressions. The
+    /// zero-element form is the unit value `()`.
+    Tuple(TupleExpression),
+    /// An index expression `<base>[<index>]`: `frame[SIGNAL_SHORT_HEADER_BYTE_COUNT..]`.
+    /// The `[…]` delimiter is a projection concern; the base and the index are stored
+    /// expressions (the index is commonly a [`Expression::Range`]).
+    Index(IndexExpression),
+    /// A half-open range `<start>..<end>` with either bound optional:
+    /// `..SIGNAL_SHORT_HEADER_BYTE_COUNT` (range-to) and
+    /// `SIGNAL_SHORT_HEADER_BYTE_COUNT..` (range-from). The `..` is a projection
+    /// concern; the present bounds are stored expressions.
+    Range(RangeExpression),
 }
 
 /// A shared-reference expression `&<referent>`. Recursion through `referent` carries
@@ -94,10 +116,12 @@ pub struct TupleFieldAccess {
     pub index: u32,
 }
 
-/// A call of a path callee with positional arguments. The callee is a plain path
-/// (`Self`, `Self::new`, `Self::Record`, `RecordIdentifier::new`) or a
-/// trait-qualified path (`<Self as Trait>::method`); the `()` re-sugaring is a
-/// projection concern.
+/// A call of a path callee with positional arguments and an optional turbofish. The
+/// callee is a plain path (`Self`, `Self::new`, `Self::Record`,
+/// `RecordIdentifier::new`) or a trait-qualified path (`<Self as Trait>::method`);
+/// the `type_arguments` are the optional turbofish (`::<rkyv::rancor::Error>` in
+/// `rkyv::to_bytes::<rkyv::rancor::Error>(self)`), an empty vector for the
+/// un-turbofished call; the `()` re-sugaring is a projection concern.
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
 #[rkyv(
     serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
@@ -106,6 +130,7 @@ pub struct TupleFieldAccess {
 )]
 pub struct Call {
     pub callee: Callee,
+    pub type_arguments: Vec<TypeReference>,
     #[rkyv(omit_bounds)]
     pub arguments: Vec<Expression>,
 }
@@ -214,4 +239,81 @@ pub enum IntegerRepresentation {
 pub struct ArrayExpression {
     #[rkyv(omit_bounds)]
     pub elements: Vec<Expression>,
+}
+
+/// The `?` try operator over a fallible inner expression: the postfix `?` in
+/// `rkyv::to_bytes::<E>(self).map_err(…)?`. Recursion through `inner` carries the
+/// rkyv self-referential bounds.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
+pub struct TryExpression {
+    #[rkyv(omit_bounds)]
+    pub inner: Box<Expression>,
+}
+
+/// A closure `|<parameters>| <body>`: `|_| SignalFrameError::ArchiveEncode`. The
+/// parameters reuse the tuple-element pattern vocabulary (a wildcard `_` or an
+/// identifier binding); the body is one expression. Recursion through `body` carries
+/// the rkyv self-referential bounds.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
+pub struct ClosureExpression {
+    pub parameters: Vec<PatternElement>,
+    #[rkyv(omit_bounds)]
+    pub body: Box<Expression>,
+}
+
+/// A tuple expression `(<elements>)`: `(route, value)`. A zero-element vector is the
+/// unit value `()`. Recursion through `elements` carries the rkyv self-referential
+/// bounds.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
+pub struct TupleExpression {
+    #[rkyv(omit_bounds)]
+    pub elements: Vec<Expression>,
+}
+
+/// An index expression `<base>[<index>]`: `frame[SIGNAL_SHORT_HEADER_BYTE_COUNT..]`.
+/// The index is commonly a [`Expression::Range`]. Recursion through `base` and
+/// `index` carries the rkyv self-referential bounds.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
+pub struct IndexExpression {
+    #[rkyv(omit_bounds)]
+    pub base: Box<Expression>,
+    #[rkyv(omit_bounds)]
+    pub index: Box<Expression>,
+}
+
+/// A half-open range `<start>..<end>` with either bound optional: `..end` (range-to),
+/// `start..` (range-from), `start..end` (the closed form). The exclusive `..` operator
+/// is a projection concern; the present bounds are stored expressions. Recursion
+/// through the bounds carries the rkyv self-referential bounds.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
+pub struct RangeExpression {
+    #[rkyv(omit_bounds)]
+    pub start: Option<Box<Expression>>,
+    #[rkyv(omit_bounds)]
+    pub end: Option<Box<Expression>>,
 }
