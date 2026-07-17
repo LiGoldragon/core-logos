@@ -15,6 +15,12 @@ pub enum Attribute {
     Derive(DeriveGroup),
     /// `#[cfg_attr(<predicate>, <inner>)]`.
     Configuration(ConfigurationAttribute),
+    /// `#[cfg(<predicate>)]` — a plain configuration gate on the whole item, e.g.
+    /// `#[cfg(feature = "nota-text")]` above the NOTA import. Distinct from
+    /// `Configuration`: that conditionally applies an *inner* attribute, this gates
+    /// the item's compilation. Reuses `ConfigurationPredicate`, the one predicate
+    /// vocabulary shared with `cfg_attr`.
+    Cfg(ConfigurationPredicate),
     /// A bare dotted tool attribute, e.g. `#[rustfmt::skip]` as `PathNode[rustfmt, skip]`.
     /// Reuses `PathNode` (not opaque text) so the `::` materializes at projection.
     ToolPath(PathNode),

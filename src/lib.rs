@@ -31,6 +31,7 @@ pub mod path;
 pub mod pattern;
 pub mod structure;
 pub mod type_reference;
+pub mod use_import;
 pub mod visibility;
 
 pub use alias::Alias;
@@ -54,4 +55,5 @@ pub use path::PathNode;
 pub use pattern::{Pattern, PatternElement, TupleVariantPattern};
 pub use structure::Struct;
 pub use type_reference::{ImplTraitType, ReferenceType, TypeApplication, TypeReference};
+pub use use_import::Use;
 pub use visibility::Visibility;

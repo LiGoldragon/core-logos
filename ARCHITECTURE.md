@@ -68,7 +68,18 @@ names seven item kinds: `Newtype`, `Struct`, `Enumeration`, `Alias`,
 **wire-contract data subset** — `Newtype`, `Struct`, `Enumeration`, `Alias`, plus
 the leaf vocabulary (attributes, visibility, paths, generics by kind) — **and now
 `ImplBlock` and `Function`** (the ontology's `FreeMethod`, modeled as one node that
-serves both an impl member and a free function).
+serves both an impl member and a free function) **and `Use`** (the `use`-import
+shape at the head of every generated module).
+
+`Use` is a `<attrs> <vis> use <base>::{<group>};` node: a base path and an ordered
+group of imported leaf identifiers, stored as data. It carries the fixed cfg-gated
+NOTA import (`#[cfg(feature = "nota-text")] pub use nota::{NotaDecodeError,
+NotaEncode, NotaSource};`) that heads the generated wire modules. Like an impl block
+it declares no name (`CoreItem::name` returns `None`); unlike one it carries its own
+visibility, so `with_visibility` stamps it. The plain `#[cfg(...)]` gate is a new
+`Attribute::Cfg(ConfigurationPredicate)` variant, reusing the one predicate
+vocabulary shared with `cfg_attr` (distinct from `Configuration`, which gates an
+inner attribute rather than the item's compilation).
 
 `ImplBlock` and `Function` carry their method **bodies** as data — the closed
 **Tier-1 expression vocabulary** (`src/expression.rs`, `src/pattern.rs`), exactly
@@ -125,13 +136,23 @@ Every choice below the psyche rulings is a revisable lean with a stated trigger:
   unwitnessed in a fully-Tier-1 body (the impls that use it carry class-B struct
   literals and are rejected whole). *Trigger:* a fully-Tier-1 body accesses a named
   field.
+- **Use imports are the brace-group form only.** `Use` models `use <base>::{<group>};`
+  — the one shape the wire goldens exercise (the NOTA import). A bare import
+  (`use foo::Bar;`), a glob (`use foo::*;`), and an aliased import (`use foo::Bar as
+  Baz;`) are unwitnessed growth points the closed shape does not carry. *Trigger:* a
+  witnessed generated module needs one of those import shapes.
+- **The cfg gate is a `Feature` predicate.** `Attribute::Cfg` reuses
+  `ConfigurationPredicate`, whose sole variant is `Feature(Identifier)` — the only
+  gate the goldens exercise (`#[cfg(feature = "nota-text")]`). *Trigger:* a witnessed
+  gate needs `all`/`any`/`not` or a non-feature key.
 
 ## Content identity and layout version across this growth
 
-Adding `ImplBlock`, `Function`, and the two new `TypeReference` variants
-(`Reference`, `ImplTrait`) is **append-only** enum growth: existing variants keep
-their rkyv discriminants, so every pre-existing Core value archives to byte-identical
-bytes and its content identity does not move. The new item kinds enter identity
+Adding `ImplBlock`, `Function`, the two `TypeReference` variants (`Reference`,
+`ImplTrait`), and now the `Use` item kind and the `Attribute::Cfg` variant is
+**append-only** enum growth: existing variants keep their rkyv discriminants, so
+every pre-existing Core value archives to byte-identical bytes and its content
+identity does not move. The new item kinds enter identity
 hashing (they are `CoreItem` values under `CoreLogosDomain`), but they are new
 content getting first-time hashes under the existing layout — there is no prior
 layout-1 hash they conflict with. Because no previously-computed identity changes,

@@ -9,6 +9,7 @@ use crate::function::Function;
 use crate::impl_block::ImplBlock;
 use crate::newtype::Newtype;
 use crate::structure::Struct;
+use crate::use_import::Use;
 use content_identity::ContentHash;
 use name_table::Identifier;
 
@@ -21,7 +22,9 @@ use name_table::Identifier;
 /// The trait definition and free-method item kinds of the accepted ontology remain
 /// out of scope for this text-free Core (see the crate ARCHITECTURE). `ImplBlock`
 /// and `Function` are modeled: their bodies are the closed Tier-1 expression
-/// vocabulary the wire goldens exercise, carried as data.
+/// vocabulary the wire goldens exercise, carried as data. `Use` models the
+/// `use`-import shape — the cfg-gated NOTA import at the head of every generated
+/// module — as stored data.
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub enum CoreItem {
     Newtype(Newtype),
@@ -30,6 +33,7 @@ pub enum CoreItem {
     Alias(Alias),
     ImplBlock(ImplBlock),
     Function(Function),
+    Use(Use),
 }
 
 impl CoreItem {
@@ -46,6 +50,9 @@ impl CoreItem {
             CoreItem::Alias(alias) => Some(alias.name),
             CoreItem::Function(function) => Some(function.name),
             CoreItem::ImplBlock(_) => None,
+            // A use import declares no name — it brings names in, it does not
+            // declare one — so it dissolves into the same `None` as an impl block.
+            CoreItem::Use(_) => None,
         }
     }
 
@@ -64,6 +71,9 @@ impl CoreItem {
             CoreItem::Alias(alias) => alias.visibility = visibility,
             CoreItem::Function(function) => function.visibility = visibility,
             CoreItem::ImplBlock(_) => {}
+            // A use import carries its own visibility (`pub use`), so it is stamped
+            // like any other visible item.
+            CoreItem::Use(use_import) => use_import.visibility = visibility,
         }
         self
     }
@@ -78,6 +88,7 @@ impl CoreItem {
             CoreItem::Alias(alias) => &alias.attributes,
             CoreItem::ImplBlock(impl_block) => &impl_block.attributes,
             CoreItem::Function(function) => &function.attributes,
+            CoreItem::Use(use_import) => &use_import.attributes,
         }
     }
 
