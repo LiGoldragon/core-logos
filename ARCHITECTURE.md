@@ -43,9 +43,10 @@ the TextualRust sibling, not here.
 ## Content identity
 
 `CoreItem::content_identity` is `ContentHash::of_core` under `CoreLogosDomain`, a
-`Contextual` hash domain tagged with `LayoutVersion(1)`. The pre-image is the
-value's canonical portable-archive bytes; the NameTable is excluded (it is not part
-of a Core value). Two invariants follow and are tested:
+`Contextual` hash domain tagged with `LayoutVersion(2)` (see "Content identity and
+layout version" below for why layout 2). The pre-image is the value's canonical
+portable-archive bytes; the NameTable is excluded (it is not part of a Core value).
+Two invariants follow and are tested:
 
 - **Rename is hash-stable.** The Core carries the identifier, never the string, so
   changing what a name projects to does not move the identity.
@@ -148,18 +149,62 @@ Every choice below the psyche rulings is a revisable lean with a stated trigger:
 
 ## Content identity and layout version across this growth
 
-Adding `ImplBlock`, `Function`, the two `TypeReference` variants (`Reference`,
-`ImplTrait`), and now the `Use` item kind and the `Attribute::Cfg` variant is
-**append-only** enum growth: existing variants keep their rkyv discriminants, so
-every pre-existing Core value archives to byte-identical bytes and its content
-identity does not move. The new item kinds enter identity
-hashing (they are `CoreItem` values under `CoreLogosDomain`), but they are new
-content getting first-time hashes under the existing layout — there is no prior
-layout-1 hash they conflict with. Because no previously-computed identity changes,
-the truthful versioning call is to **keep `LayoutVersion(1)`**: bumping would move
-every existing hash for no semantic reason, manufacturing a break. The layout
-version protects pre-image *format* compatibility, and the format is unchanged for
-all existing values — the algebra grew, as it is designed to.
+**The layout is 2, and the correction below records why.** An earlier version of
+this document claimed that adding item kinds was "append-only" enum growth under
+which "every pre-existing Core value archives to byte-identical bytes and its
+content identity does not move," and concluded that `LayoutVersion(1)` should be
+kept. **That reasoning was wrong, and the claim was false.** The commit messages
+that shipped the growth are history and stand; this document must tell the truth,
+so it records the correction here.
+
+The error was reasoning about append-only-ness at the **Rust source level** and
+assuming it carried to the **archived byte level**. It does not, because of how
+rkyv lays out enums. rkyv archives an enum at a **fixed size equal to its largest
+variant** — every `ArchivedCoreItem`, regardless of which variant it holds,
+occupies the same footprint. Content identity is blake3 over the **full archived
+root**, so that footprint is in the pre-image of every value.
+
+Concretely, on the empirical record:
+
+- Commit `be809429` added the `Function` variant, whose archived form grew
+  `ArchivedCoreItem`'s max size from **47 to 101 bytes**. Every `CoreItem` value —
+  including shapes untouched at the Rust source level — therefore re-serialized
+  larger and its content hash **moved**: a same-shape `Newtype` went from 51 to 105
+  archived bytes and its hash moved from `2c26397e…` to `1c8ae182…`. Yet
+  `LayoutVersion` stayed `new(1)` and this document claimed identity did not move.
+  The claim was false; the layout should have been bumped at that commit.
+- Commit `f7dd7d6b` inserted `Attribute::Cfg` at discriminant index 2, **shifting**
+  the `ToolPath` and `HelperDerive` tags. That is a discriminant reordering, not
+  append-only growth — it moves the archived tag byte of every attribute at or after
+  that index. It happened to be **benign for `CoreItem`'s hash only because the
+  attribute enum's max variant size did not change**, so `ArchivedCoreItem`'s
+  footprint was unaffected. Benign-by-luck is still a layout-relevant change of
+  exactly the mis-grounded kind: the safe discipline is to treat any discriminant
+  reordering as hash-affecting unless proven otherwise.
+
+The truthful rule, now enforced: **any change to the archived representation moves
+hashes and demands a deliberate `LayoutVersion` bump.** That includes max-variant
+growth (a new or larger variant enlarging the fixed enum footprint), discriminant
+reordering, and field-layout changes. "Append-only" at the Rust source level does
+**not** imply archived-byte stability under rkyv's fixed-size enum layout. The
+layout version protects the pre-image *format*, and the format changed — the enum
+footprint grew — so the version moves with it. `LayoutVersion(1)` hashed the
+pre-`be809429` shape; **`LayoutVersion(2)` hashes the shipped shape**, and covers
+both the `Function` growth and the `Cfg` discriminant shift in one honest bump.
+
+This class of silent drift shipped because there was **no witness**. There now is:
+`tests/content_hash_witness.rs` pins an **absolute** content-hash constant for a
+representative value under the current layout. Any future change to the archived
+representation fails that test loudly, forcing a deliberate layout bump and a
+deliberate constant update rather than a silent hash move.
+
+**Consumers cross a hash boundary at layout 2.** Any consumer advancing its
+`core-logos` pin across `be809429` and later moves from layout-1 hashes to
+layout-2 hashes: every CoreLogos content identity it computes changes. A host
+survey at the time of this correction confirmed **no durable store or fixture holds
+persisted CoreLogos hashes** (everything recomputes, or is tempdir-ephemeral), so
+this correction needs no data migration — but the boundary is real, and a consumer
+must advance across it only via the deliberate cascade slice, never casually.
 
 ## Release-train status
 

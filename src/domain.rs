@@ -13,7 +13,20 @@ impl HashDomain for CoreLogosDomain {
     fn separation() -> DomainSeparation {
         DomainSeparation::Contextual {
             context: "core-logos 2026 stringless core algebra of logos",
-            layout: LayoutVersion::new(1),
+            // Layout 2 covers the shipped archived-shape change. rkyv archives an
+            // enum at a fixed size equal to its largest variant, so adding the
+            // `Function` item kind (commit be809429) grew `ArchivedCoreItem`'s max
+            // size from 47 to 101 bytes: EVERY `CoreItem` value — including
+            // pre-existing shapes untouched at the Rust-source level — now
+            // re-serializes larger, and its content identity (blake3 over the full
+            // archived root) moved. Append-only enum growth at the Rust-source level
+            // does NOT imply archived-byte stability under rkyv's fixed-size enum
+            // layout. Layout 1 hashed the pre-be809429 shape; layout 2 hashes the
+            // shipped shape. Any future change to the archived representation —
+            // max-variant growth, discriminant reordering, or field layout — moves
+            // hashes and demands a deliberate bump, witnessed by the golden-hash
+            // constant in `tests/content_hash.rs`.
+            layout: LayoutVersion::new(2),
         }
     }
 }
