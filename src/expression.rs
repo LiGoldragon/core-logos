@@ -21,6 +21,7 @@
 //! - `0x0001000000000000`, `8` → [`Expression::IntegerLiteral`]
 //! - `["Record", "Observe"]` → [`Expression::Array`]
 //! - `match self { … }` → [`Expression::Match`]
+//! - `FrameBody::Request { exchange, request }` → [`Expression::StructLiteral`]
 //!
 //! Every recursive slot is behind a struct that carries the rkyv self-referential
 //! bounds, mirroring the leaf `TypeApplication`/`ConfigurationAttribute` pattern, so
@@ -86,6 +87,12 @@ pub enum Expression {
     /// `SIGNAL_SHORT_HEADER_BYTE_COUNT..` (range-from). The `..` is a projection
     /// concern; the present bounds are stored expressions.
     Range(RangeExpression),
+    /// A struct or struct-variant literal `<path> { <fields> }`:
+    /// `FrameBody::Request { exchange, request }`. The `{ … }` delimiter and the
+    /// field separators are projection concerns; the path and the ordered field
+    /// initializers are stored expressions. Field shorthand is not a special case —
+    /// it is a [`FieldInitializer`] whose value is `None`.
+    StructLiteral(StructLiteral),
 }
 
 /// A shared-reference expression `&<referent>`. Recursion through `referent` carries
@@ -316,4 +323,39 @@ pub struct RangeExpression {
     pub start: Option<Box<Expression>>,
     #[rkyv(omit_bounds)]
     pub end: Option<Box<Expression>>,
+}
+
+/// A struct or struct-variant literal `<path> { <fields> }`:
+/// `FrameBody::Request { exchange, request }`. The `path` is the struct or
+/// enum-variant path; the `fields` are the ordered field initializers. Recursion
+/// through `fields` (each carrying an optional boxed value) carries the rkyv
+/// self-referential bounds.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
+pub struct StructLiteral {
+    pub path: PathNode,
+    #[rkyv(omit_bounds)]
+    pub fields: Vec<FieldInitializer>,
+}
+
+/// One field initializer of a [`StructLiteral`]. A `None` value is the field
+/// shorthand form `exchange` — the field name and the in-scope binding coincide; a
+/// `Some` value is the explicit `name: <expression>` form. Modeling shorthand as the
+/// absent value dissolves the "shorthand or explicit" question into the normal
+/// optional-value read rather than a separate flag. Recursion through the boxed value
+/// carries the rkyv self-referential bounds.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
+pub struct FieldInitializer {
+    pub name: Identifier,
+    #[rkyv(omit_bounds)]
+    pub value: Option<Box<Expression>>,
 }

@@ -45,9 +45,10 @@ pub use domain::CoreLogosDomain;
 pub use enumeration::{Enumeration, Variant, VariantPayload};
 pub use error::Error;
 pub use expression::{
-    ArrayExpression, Call, Callee, ClosureExpression, Expression, IndexExpression, IntegerLiteral,
-    IntegerRepresentation, Match, MatchArm, MethodCall, QualifiedPath, RangeExpression,
-    ReferenceExpression, TryExpression, TupleExpression, TupleFieldAccess,
+    ArrayExpression, Call, Callee, ClosureExpression, Expression, FieldInitializer, IndexExpression,
+    IntegerLiteral, IntegerRepresentation, Match, MatchArm, MethodCall, QualifiedPath,
+    RangeExpression, ReferenceExpression, StructLiteral, TryExpression, TupleExpression,
+    TupleFieldAccess,
 };
 pub use field::Field;
 pub use function::{Block, Function, LetBinding, LetStatement, Parameter, Receiver, Statement};

@@ -23,17 +23,17 @@ use core_logos::CoreLogosDomain;
 use name_table::NameTable;
 
 /// The content identity of the `CommitSequence` golden newtype under the current
-/// CoreLogos layout, as a lowercase hex blake3 digest. Pinned at layout 5, the
-/// version that adds the ordinary-exchange codec-body vocabulary to the archived
-/// shape (`Block` gained `statements`, `Call` gained `type_arguments`, the
-/// `Expression` and `Pattern` algebras grew, enlarging the fixed-size `CoreItem`
-/// archived bytes). `commit_sequence` uses none of the new nodes, so its projection
-/// is unchanged; only its archived bytes — and therefore this pinned digest — moved
-/// with the layout. The value is a deterministic function of the golden fixture:
+/// CoreLogos layout, as a lowercase hex blake3 digest. Pinned at layout 6, the
+/// version that adds the ordinary-exchange envelope vocabulary to the archived shape
+/// (the `Expression` algebra grew the `StructLiteral` node the `into_frame` /
+/// `into_reply_frame` bodies construct, enlarging the fixed-size `CoreItem` archived
+/// bytes). `commit_sequence` uses none of the new nodes, so its projection is
+/// unchanged; only its archived bytes — and therefore this pinned digest — moved with
+/// the layout. The value is a deterministic function of the golden fixture:
 /// `commit_sequence` interns into a fresh NameTable in a fixed order, so the stored
 /// identifier indices — and thus the archived bytes — are reproducible.
-const COMMIT_SEQUENCE_IDENTITY_LAYOUT_5: &str =
-    "5af58f4e304a8d04ed80c1668824ccd9599c4b301ead840939dccc40b2010f24";
+const COMMIT_SEQUENCE_IDENTITY_LAYOUT_6: &str =
+    "8553cb87a1be10e2c7634a913aba1c3fe4bf15840b649d5e39fec334a6667301";
 
 #[test]
 fn commit_sequence_identity_is_pinned_under_the_current_layout() {
@@ -42,7 +42,7 @@ fn commit_sequence_identity_is_pinned_under_the_current_layout() {
     // definition and must be re-derived deliberately.
     assert_eq!(
         CoreLogosDomain::layout_version().value(),
-        5,
+        6,
         "the witnessed layout version moved; re-derive the pinned hash deliberately",
     );
 
@@ -52,7 +52,7 @@ fn commit_sequence_identity_is_pinned_under_the_current_layout() {
 
     assert_eq!(
         identity.to_hexadecimal(),
-        COMMIT_SEQUENCE_IDENTITY_LAYOUT_5,
+        COMMIT_SEQUENCE_IDENTITY_LAYOUT_6,
         "the archived representation of CommitSequence changed — this is a layout \
          event: bump CoreLogosDomain's LayoutVersion in src/domain.rs, document why \
          the archived shape moved, and update this constant deliberately",

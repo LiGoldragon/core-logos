@@ -13,17 +13,14 @@ impl HashDomain for CoreLogosDomain {
     fn separation() -> DomainSeparation {
         DomainSeparation::Contextual {
             context: "core-logos 2026 stringless core algebra of logos",
-            // Layout 5 adds the ordinary-exchange codec-body vocabulary. `Block`
-            // gained `statements: Vec<Statement>` (the `let` bindings ahead of a codec
-            // body's tail), `Call` gained `type_arguments: Vec<TypeReference>` (the
-            // turbofish in `rkyv::to_bytes::<E>(self)`), the `Expression` algebra grew
-            // the `Try` / `Closure` / `Tuple` / `Index` / `Range` nodes the frame
-            // encode/decode bodies exercise, `TypeReference` grew the `Tuple` type (the
-            // `(InputRoute, Self)` decode return), and `Pattern` grew the `Wildcard` arm
-            // the open-`u64`-header match needs. rkyv archives a struct as the
-            // concatenation of its fields and an enum sized to its largest variant, so
-            // this growth enlarges every `CoreItem` value's archived bytes; the bump is
-            // deliberate and honest, exactly as the truthful rule demands.
+            // Layout 6 adds the ordinary-exchange envelope vocabulary. The
+            // `Expression` algebra grew the `StructLiteral` node (the
+            // `FrameBody::Request { exchange, request }` bodies `into_frame` /
+            // `into_reply_frame` construct), and a struct-literal field is a
+            // `FieldInitializer` whose value is an optional boxed expression. rkyv
+            // sizes an enum to its largest variant, so this new expression node
+            // enlarges every `CoreItem` value's archived bytes; the bump is deliberate
+            // and honest, exactly as the truthful rule demands.
             //
             // Layout history (each bump hashed a strictly larger archived shape):
             //   * Layout 2 hashed the pre-extension shape;
@@ -31,13 +28,20 @@ impl HashDomain for CoreLogosDomain {
             //     `Module` item kinds, `ImplBlock`'s `items: Vec<ImplItem>`, and the
             //     expression/type tail growth);
             //   * Layout 4 hashed the tuple-field-visibility extension;
-            //   * Layout 5 hashes the ordinary-exchange codec-body vocabulary.
+            //   * Layout 5 hashed the ordinary-exchange codec-body vocabulary (`Block`
+            //     gained `statements`, `Call` gained `type_arguments`, and the
+            //     `Expression` / `TypeReference` / `Pattern` algebras grew the
+            //     `Try` / `Closure` / `Tuple` / `Index` / `Range` / tuple-type /
+            //     wildcard-pattern nodes the frame encode/decode bodies exercise);
+            //   * Layout 6 hashes the ordinary-exchange envelope vocabulary (the
+            //     `StructLiteral` expression node the `into_frame` / `into_reply_frame`
+            //     bodies construct).
             //
             // Any future archived-representation change — max-variant growth,
             // discriminant reordering, or field layout — moves hashes and demands a
             // deliberate bump, witnessed by the golden-hash constant in
             // `tests/content_hash_witness.rs`.
-            layout: LayoutVersion::new(5),
+            layout: LayoutVersion::new(6),
         }
     }
 }
