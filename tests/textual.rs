@@ -40,8 +40,13 @@ use structural_codec::table::{
 use structural_codec::value::StructuralValue;
 use structural_codec::{
     AtomForm, ConstructorCodec, DecodeError, EncodeError, SequenceForm, StructuralEntry,
-    StructuralForm, TextualForm,
+    StructuralForm, Textual, TextualForm,
 };
+
+/// The logos language identity — the `T` the mouth's produced
+/// `TextualForm<LogosLanguage>` view value carries. A stringless marker.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct LogosLanguage;
 
 // The logos textual universe's type ids (locals in the fixture universe namespace).
 const ITEM: ScopedCoreTypeId = ScopedCoreTypeId::fixture(1);
@@ -69,6 +74,8 @@ enum LogosTextError {
     Decode(#[from] DecodeError),
     #[error(transparent)]
     Encode(#[from] EncodeError),
+    #[error(transparent)]
+    SingleChunk(#[from] structural_codec::error::SingleChunkRequired),
     #[error(transparent)]
     Names(#[from] NameTableError),
     #[error("the source held no root object to decode")]
@@ -669,8 +676,9 @@ impl TextualLogos {
     }
 }
 
-impl TextualForm for TextualLogos {
+impl Textual for TextualLogos {
     type Encoded = CoreItem;
+    type Language = LogosLanguage;
     type Error = LogosTextError;
 
     fn structuretree(&self) -> &AddressedStructuralTable {
@@ -713,9 +721,12 @@ fn golden_commit_sequence_round_trips_through_the_organs() {
     let mut names = NameTable::new();
     let golden = support::commit_sequence(&mut names);
 
-    // view: the EncodedForm value -> canonical Protos text through the organs.
-    let text = mouth.view(ITEM, &golden, &mut names).expect("view golden");
-    println!("golden CommitSequence text:\n{text}");
+    // view: the EncodedForm value -> canonical Protos text through the organs. Text
+    // crosses only inside the mouth's `TextualForm<LogosLanguage>` value.
+    let text: TextualForm<LogosLanguage> =
+        mouth.view(ITEM, &golden, &mut names).expect("view golden");
+    let text_str = text.sole_text().expect("sole view text");
+    println!("golden CommitSequence text:\n{text_str}");
 
     // Every datum is visible — the psyche rejected any text that hides the attributes.
     for datum in [
@@ -739,8 +750,8 @@ fn golden_commit_sequence_round_trips_through_the_organs() {
         "Integer",
     ] {
         assert!(
-            text.contains(datum),
-            "the text must carry `{datum}` visibly: {text}"
+            text_str.contains(datum),
+            "the text must carry `{datum}` visibly: {text_str}"
         );
     }
 
