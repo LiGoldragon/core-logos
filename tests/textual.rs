@@ -231,10 +231,8 @@ impl TextualLogos {
     /// `ToolPath.rustfmt.skip`, `Configuration.{ <predicate> <inner> }`,
     /// `Derive.[ <paths> ]`.
     fn attribute_entry(lexicon: &Lexicon) -> StructuralEntry {
-        let tool_path = Self::keyword_application(
-            lexicon.tool_path,
-            StructuralForm::Delegate(PATH_NODE),
-        );
+        let tool_path =
+            Self::keyword_application(lexicon.tool_path, StructuralForm::Delegate(PATH_NODE));
         let configuration = Self::keyword_application(
             lexicon.configuration,
             StructuralForm::Delimited {
@@ -367,7 +365,10 @@ impl TextualLogos {
                 Ok(Attribute::Configuration(ConfigurationAttribute {
                     predicate: self.reify_predicate(predicate, names)?,
                     inner: Box::new(
-                        self.reify_attribute(Self::delegated(inner, "configuration inner")?, names)?,
+                        self.reify_attribute(
+                            Self::delegated(inner, "configuration inner")?,
+                            names,
+                        )?,
                     ),
                 }))
             }
@@ -437,7 +438,9 @@ impl TextualLogos {
         names: &mut NameTable,
     ) -> Result<StructuralValue, LogosTextError> {
         let CoreItem::Newtype(newtype) = item else {
-            return Err(LogosTextError::ReifyShape("only Newtype items are authored"));
+            return Err(LogosTextError::ReifyShape(
+                "only Newtype items are authored",
+            ));
         };
         let body = StructuralValue::Delimited(vec![
             self.reflect_visibility(&newtype.visibility, names),
@@ -455,7 +458,11 @@ impl TextualLogos {
         ))
     }
 
-    fn reflect_visibility(&self, visibility: &Visibility, names: &mut NameTable) -> StructuralValue {
+    fn reflect_visibility(
+        &self,
+        visibility: &Visibility,
+        names: &mut NameTable,
+    ) -> StructuralValue {
         let (constructor, keyword) = match visibility {
             Visibility::Public => (VISIBILITY_PUBLIC, "Public"),
             Visibility::Private => (VISIBILITY_PRIVATE, "Private"),
@@ -549,12 +556,16 @@ impl TextualLogos {
         _names: &mut NameTable,
     ) -> Result<StructuralValue, LogosTextError> {
         let TypeReference::Path(path) = type_reference else {
-            return Err(LogosTextError::ReifyShape("only Path type references authored"));
+            return Err(LogosTextError::ReifyShape(
+                "only Path type references authored",
+            ));
         };
-        Ok(StructuralValue::Delegated(Box::new(StructuralValue::chosen(
-            0,
-            StructuralValue::Delegated(Box::new(Self::reflect_path(path))),
-        ))))
+        Ok(StructuralValue::Delegated(Box::new(
+            StructuralValue::chosen(
+                0,
+                StructuralValue::Delegated(Box::new(Self::reflect_path(path))),
+            ),
+        )))
     }
 
     fn reflect_path(path: &PathNode) -> StructuralValue {
@@ -727,14 +738,22 @@ fn golden_commit_sequence_round_trips_through_the_organs() {
         "Private",
         "Integer",
     ] {
-        assert!(text.contains(datum), "the text must carry `{datum}` visibly: {text}");
+        assert!(
+            text.contains(datum),
+            "the text must carry `{datum}` visibly: {text}"
+        );
     }
 
     // unview: the text -> the EncodedForm value, through the same organs.
-    let decoded = mouth.unview(ITEM, &text, &mut names).expect("unview golden");
+    let decoded = mouth
+        .unview(ITEM, &text, &mut names)
+        .expect("unview golden");
     assert_eq!(golden, decoded, "value -> text -> value is lossless");
 
     // The recovered value re-views to byte-identical text.
     let re_viewed = mouth.view(ITEM, &decoded, &mut names).expect("re-view");
-    assert_eq!(text, re_viewed, "the canonical text is stable across the round-trip");
+    assert_eq!(
+        text, re_viewed,
+        "the canonical text is stable across the round-trip"
+    );
 }
