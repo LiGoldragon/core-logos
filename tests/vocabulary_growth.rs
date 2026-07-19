@@ -8,7 +8,7 @@ mod support;
 
 use content_identity::PortableArchive;
 use core_logos::{
-    ArrayExpression, AssociatedType, Attribute, Const, CoreItem, Expression, IntegerLiteral,
+    ArrayExpression, AssociatedType, Attribute, Const, EncodedItem, Expression, IntegerLiteral,
     IntegerRepresentation, Module, ReferenceExpression, ReferenceMutability, ReferenceType,
     SliceType, TypeReference, Visibility,
 };
@@ -16,8 +16,8 @@ use name_table::NameTable;
 
 /// The `short_header` const module: `pub mod short_header { pub const INPUT_RECORD:
 /// u64 = 0x0000000000000000; }` as a stringless Core value.
-fn short_header_module(names: &mut NameTable) -> CoreItem {
-    let input_record = CoreItem::Const(Const {
+fn short_header_module(names: &mut NameTable) -> EncodedItem {
+    let input_record = EncodedItem::Const(Const {
         visibility: Visibility::Public,
         attributes: Vec::new(),
         name: support::identifier(names, "INPUT_RECORD"),
@@ -27,7 +27,7 @@ fn short_header_module(names: &mut NameTable) -> CoreItem {
             representation: IntegerRepresentation::Hexadecimal { minimum_digits: 16 },
         }),
     });
-    CoreItem::Module(Module {
+    EncodedItem::Module(Module {
         visibility: Visibility::Public,
         attributes: vec![Attribute::ToolPath(support::path(
             names,
@@ -73,7 +73,7 @@ fn a_const_module_round_trips_through_portable_archive() {
     let item = short_header_module(&mut names);
 
     let bytes = item.to_archive_bytes().expect("serialize");
-    let restored = CoreItem::from_archive_bytes(&bytes).expect("deserialize");
+    let restored = EncodedItem::from_archive_bytes(&bytes).expect("deserialize");
 
     assert_eq!(item, restored);
     assert!(item.name().is_some(), "a module declares a name");
@@ -82,10 +82,10 @@ fn a_const_module_round_trips_through_portable_archive() {
 #[test]
 fn an_associated_const_round_trips_through_portable_archive() {
     let mut names = NameTable::new();
-    let item = CoreItem::Const(heads_const(&mut names));
+    let item = EncodedItem::Const(heads_const(&mut names));
 
     let bytes = item.to_archive_bytes().expect("serialize");
-    let restored = CoreItem::from_archive_bytes(&bytes).expect("deserialize");
+    let restored = EncodedItem::from_archive_bytes(&bytes).expect("deserialize");
 
     assert_eq!(item, restored);
 }
@@ -105,7 +105,7 @@ fn editing_a_literal_value_moves_the_const_identity() {
             representation: IntegerRepresentation::Hexadecimal { minimum_digits: 16 },
         }),
     };
-    let before = CoreItem::Const(base.clone())
+    let before = EncodedItem::Const(base.clone())
         .content_identity()
         .expect("hash");
 
@@ -117,7 +117,7 @@ fn editing_a_literal_value_moves_the_const_identity() {
         }),
         ..base
     };
-    let after = CoreItem::Const(edited).content_identity().expect("hash");
+    let after = EncodedItem::Const(edited).content_identity().expect("hash");
 
     assert_ne!(
         before.bytes(),
@@ -134,7 +134,7 @@ fn the_integer_representation_is_part_of_the_identity() {
     let type_reference = TypeReference::Path(support::path(&mut names, &["u64"]));
     let name = support::identifier(&mut names, "HEADER");
     let make = |representation| {
-        CoreItem::Const(Const {
+        EncodedItem::Const(Const {
             visibility: Visibility::Public,
             attributes: Vec::new(),
             name,
@@ -184,7 +184,7 @@ fn an_impl_block_carries_heterogeneous_members_in_order() {
             }),
         },
     });
-    let item = CoreItem::ImplBlock(ImplBlock {
+    let item = EncodedItem::ImplBlock(ImplBlock {
         attributes: Vec::new(),
         generics: Generics::none(),
         implemented_trait: None,
@@ -193,10 +193,10 @@ fn an_impl_block_carries_heterogeneous_members_in_order() {
     });
 
     let bytes = item.to_archive_bytes().expect("serialize");
-    let restored = CoreItem::from_archive_bytes(&bytes).expect("deserialize");
+    let restored = EncodedItem::from_archive_bytes(&bytes).expect("deserialize");
     assert_eq!(item, restored);
 
-    let CoreItem::ImplBlock(restored_block) = restored else {
+    let EncodedItem::ImplBlock(restored_block) = restored else {
         panic!("impl block");
     };
     assert!(matches!(

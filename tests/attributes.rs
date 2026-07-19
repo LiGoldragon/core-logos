@@ -4,7 +4,7 @@
 mod support;
 
 use content_identity::PortableArchive;
-use core_logos::{Attribute, CoreItem};
+use core_logos::{Attribute, EncodedItem};
 use name_table::NameTable;
 
 #[test]
@@ -26,7 +26,7 @@ fn attribute_order_round_trips_through_portable_archive() {
     let original = item.attributes().to_vec();
 
     let bytes = item.to_archive_bytes().expect("serialize");
-    let restored = CoreItem::from_archive_bytes(&bytes).expect("deserialize");
+    let restored = EncodedItem::from_archive_bytes(&bytes).expect("deserialize");
 
     assert_eq!(restored.attributes(), original.as_slice());
 }
@@ -37,11 +37,13 @@ fn reordering_attributes_moves_content_identity() {
     let item = support::commit_sequence(&mut names);
     let before = item.content_identity().expect("hash");
 
-    let CoreItem::Newtype(mut newtype) = item.clone() else {
+    let EncodedItem::Newtype(mut newtype) = item.clone() else {
         panic!("newtype");
     };
     newtype.attributes.reverse();
-    let after = CoreItem::Newtype(newtype).content_identity().expect("hash");
+    let after = EncodedItem::Newtype(newtype)
+        .content_identity()
+        .expect("hash");
 
     assert_ne!(
         before.bytes(),

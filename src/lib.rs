@@ -8,9 +8,9 @@
 //! are all projection concerns that materialize far from this crate, in the later
 //! `TextualRust` sibling codec.
 //!
-//! The centerpiece is [`CoreItem`], a closed enum over a shared stringless leaf
-//! vocabulary. Content identity ([`CoreItem::content_identity`]) is computed over a
-//! value's portable-archive bytes under [`CoreLogosDomain`], with the NameTable
+//! The centerpiece is [`EncodedItem`], a closed enum over a shared stringless leaf
+//! vocabulary. Content identity ([`EncodedItem::content_identity`]) is computed over a
+//! value's portable-archive bytes under [`EncodedLogosDomain`], with the NameTable
 //! excluded — so a rename is hash-stable and a structural edit moves the identity.
 //! The NameTable is one continuous identifier space extending the schema NameTable
 //! (via [`name_table::NameTable::extend_from`]).
@@ -41,7 +41,7 @@ pub use attribute::{
     Attribute, ConfigurationAttribute, ConfigurationPredicate, DeriveGroup, HelperDerive,
 };
 pub use const_item::Const;
-pub use domain::CoreLogosDomain;
+pub use domain::EncodedLogosDomain;
 pub use enumeration::{Enumeration, Variant, VariantPayload};
 pub use error::Error;
 pub use expression::{
@@ -54,7 +54,7 @@ pub use field::Field;
 pub use function::{Block, Function, LetBinding, LetStatement, Parameter, Receiver, Statement};
 pub use generics::{GenericParameter, Generics, LifetimeParameter, TypeParameter};
 pub use impl_block::{AssociatedType, ImplBlock, ImplItem};
-pub use item::CoreItem;
+pub use item::EncodedItem;
 pub use module::Module;
 pub use newtype::Newtype;
 pub use path::PathNode;

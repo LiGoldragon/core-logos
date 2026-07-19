@@ -2,7 +2,7 @@
 
 mod support;
 
-use core_logos::{CoreItem, Newtype, TypeReference, Visibility};
+use core_logos::{EncodedItem, Newtype, TypeReference, Visibility};
 use name_table::{Identifier, Name, NameTable};
 
 /// Rebuild a table identical to `original` except that `target` resolves to
@@ -51,7 +51,7 @@ fn a_structural_edit_moves_core_identity() {
     let before = integer_wrapped.content_identity().expect("hash");
 
     // Same name and preamble, a different wrapped type — a structural edit.
-    let edited = CoreItem::Newtype(Newtype {
+    let edited = EncodedItem::Newtype(Newtype {
         visibility: Visibility::Public,
         attributes: support::golden_preamble(&mut names),
         name: integer_wrapped
@@ -76,11 +76,13 @@ fn a_visibility_edit_moves_core_identity() {
     let before = public.content_identity().expect("hash");
 
     // Visibility is stored data — changing it changes the Core value's identity.
-    let CoreItem::Newtype(mut newtype) = public.clone() else {
+    let EncodedItem::Newtype(mut newtype) = public.clone() else {
         panic!("newtype");
     };
     newtype.visibility = Visibility::Crate;
-    let after = CoreItem::Newtype(newtype).content_identity().expect("hash");
+    let after = EncodedItem::Newtype(newtype)
+        .content_identity()
+        .expect("hash");
 
     assert_ne!(before.bytes(), after.bytes());
 }
@@ -94,11 +96,13 @@ fn a_tuple_field_visibility_edit_moves_core_identity() {
     // The tuple field's own visibility is stored data exactly as the item's is:
     // promoting `CommitSequence(Integer)` to `CommitSequence(pub Integer)` is a
     // structural edit, so the Core value's identity moves.
-    let CoreItem::Newtype(mut newtype) = private_field.clone() else {
+    let EncodedItem::Newtype(mut newtype) = private_field.clone() else {
         panic!("newtype");
     };
     newtype.wrapped_visibility = Visibility::Public;
-    let after = CoreItem::Newtype(newtype).content_identity().expect("hash");
+    let after = EncodedItem::Newtype(newtype)
+        .content_identity()
+        .expect("hash");
 
     assert_ne!(before.bytes(), after.bytes());
 }

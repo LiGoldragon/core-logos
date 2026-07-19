@@ -1,9 +1,9 @@
-//! The closed CoreItem algebra and its content identity.
+//! The closed EncodedItem algebra and its content identity.
 
 use crate::alias::Alias;
 use crate::attribute::Attribute;
 use crate::const_item::Const;
-use crate::domain::CoreLogosDomain;
+use crate::domain::EncodedLogosDomain;
 use crate::enumeration::Enumeration;
 use crate::error::Error;
 use crate::function::Function;
@@ -28,7 +28,7 @@ use name_table::Identifier;
 /// `use`-import shape — the cfg-gated NOTA import at the head of every generated
 /// module — as stored data.
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
-pub enum CoreItem {
+pub enum EncodedItem {
     Newtype(Newtype),
     Struct(Struct),
     Enumeration(Enumeration),
@@ -40,7 +40,7 @@ pub enum CoreItem {
     Module(Module),
 }
 
-impl CoreItem {
+impl EncodedItem {
     /// The declared name of this item as a stored `Identifier`, when it has one.
     /// Exhaustive over the closed algebra — no wildcard arm. An impl block declares
     /// no name (it attaches functions to a self type), so it dissolves the "does
@@ -48,17 +48,17 @@ impl CoreItem {
     /// identifier.
     pub fn name(&self) -> Option<Identifier> {
         match self {
-            CoreItem::Newtype(newtype) => Some(newtype.name),
-            CoreItem::Struct(structure) => Some(structure.name),
-            CoreItem::Enumeration(enumeration) => Some(enumeration.name),
-            CoreItem::Alias(alias) => Some(alias.name),
-            CoreItem::Function(function) => Some(function.name),
-            CoreItem::Const(const_item) => Some(const_item.name),
-            CoreItem::Module(module) => Some(module.name),
-            CoreItem::ImplBlock(_) => None,
+            EncodedItem::Newtype(newtype) => Some(newtype.name),
+            EncodedItem::Struct(structure) => Some(structure.name),
+            EncodedItem::Enumeration(enumeration) => Some(enumeration.name),
+            EncodedItem::Alias(alias) => Some(alias.name),
+            EncodedItem::Function(function) => Some(function.name),
+            EncodedItem::Const(const_item) => Some(const_item.name),
+            EncodedItem::Module(module) => Some(module.name),
+            EncodedItem::ImplBlock(_) => None,
             // A use import declares no name — it brings names in, it does not
             // declare one — so it dissolves into the same `None` as an impl block.
-            CoreItem::Use(_) => None,
+            EncodedItem::Use(_) => None,
         }
     }
 
@@ -71,17 +71,17 @@ impl CoreItem {
     /// visibility (Rust has no `pub impl`), so it is returned unchanged.
     pub fn with_visibility(mut self, visibility: crate::visibility::Visibility) -> Self {
         match &mut self {
-            CoreItem::Newtype(newtype) => newtype.visibility = visibility,
-            CoreItem::Struct(structure) => structure.visibility = visibility,
-            CoreItem::Enumeration(enumeration) => enumeration.visibility = visibility,
-            CoreItem::Alias(alias) => alias.visibility = visibility,
-            CoreItem::Function(function) => function.visibility = visibility,
-            CoreItem::Const(const_item) => const_item.visibility = visibility,
-            CoreItem::Module(module) => module.visibility = visibility,
-            CoreItem::ImplBlock(_) => {}
+            EncodedItem::Newtype(newtype) => newtype.visibility = visibility,
+            EncodedItem::Struct(structure) => structure.visibility = visibility,
+            EncodedItem::Enumeration(enumeration) => enumeration.visibility = visibility,
+            EncodedItem::Alias(alias) => alias.visibility = visibility,
+            EncodedItem::Function(function) => function.visibility = visibility,
+            EncodedItem::Const(const_item) => const_item.visibility = visibility,
+            EncodedItem::Module(module) => module.visibility = visibility,
+            EncodedItem::ImplBlock(_) => {}
             // A use import carries its own visibility (`pub use`), so it is stamped
             // like any other visible item.
-            CoreItem::Use(use_import) => use_import.visibility = visibility,
+            EncodedItem::Use(use_import) => use_import.visibility = visibility,
         }
         self
     }
@@ -90,23 +90,23 @@ impl CoreItem {
     /// algebra — no wildcard arm.
     pub fn attributes(&self) -> &[Attribute] {
         match self {
-            CoreItem::Newtype(newtype) => &newtype.attributes,
-            CoreItem::Struct(structure) => &structure.attributes,
-            CoreItem::Enumeration(enumeration) => &enumeration.attributes,
-            CoreItem::Alias(alias) => &alias.attributes,
-            CoreItem::ImplBlock(impl_block) => &impl_block.attributes,
-            CoreItem::Function(function) => &function.attributes,
-            CoreItem::Use(use_import) => &use_import.attributes,
-            CoreItem::Const(const_item) => &const_item.attributes,
-            CoreItem::Module(module) => &module.attributes,
+            EncodedItem::Newtype(newtype) => &newtype.attributes,
+            EncodedItem::Struct(structure) => &structure.attributes,
+            EncodedItem::Enumeration(enumeration) => &enumeration.attributes,
+            EncodedItem::Alias(alias) => &alias.attributes,
+            EncodedItem::ImplBlock(impl_block) => &impl_block.attributes,
+            EncodedItem::Function(function) => &function.attributes,
+            EncodedItem::Use(use_import) => &use_import.attributes,
+            EncodedItem::Const(const_item) => &const_item.attributes,
+            EncodedItem::Module(module) => &module.attributes,
         }
     }
 
     /// The content identity of this item over its canonical portable-archive bytes,
-    /// domain-separated and layout-versioned by `CoreLogosDomain`. The NameTable is
+    /// domain-separated and layout-versioned by `EncodedLogosDomain`. The NameTable is
     /// not part of the pre-image, so renaming is hash-stable and a structural edit
     /// moves the identity.
-    pub fn content_identity(&self) -> Result<ContentHash<CoreLogosDomain>, Error> {
+    pub fn content_identity(&self) -> Result<ContentHash<EncodedLogosDomain>, Error> {
         Ok(ContentHash::of_core(self)?)
     }
 }

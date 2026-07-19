@@ -5,7 +5,7 @@ The stringless Core algebra of Logos — the Rust-equivalent data language,
 
 Logos models a standardized Rust subset as exploded, non-sugared, strictly-typed
 positional data. `core-logos` is the **Core** layer of that model: a closed
-`CoreItem` algebra over a shared stringless leaf vocabulary. It is **text-free** by
+`EncodedItem` algebra over a shared stringless leaf vocabulary. It is **text-free** by
 design — it depends on no `syn`, `prettyplease`, `quote`, or proc-macro machinery.
 Rendering Logos to and from Rust text is the job of a later sibling crate,
 `TextualRust`; Core never depends on text.
@@ -24,7 +24,7 @@ Rendering Logos to and from Rust text is the job of a later sibling crate,
 
 ## The algebra
 
-`CoreItem` is a closed enum — exhaustively matched, no wildcard arms — over four
+`EncodedItem` is a closed enum — exhaustively matched, no wildcard arms — over four
 data-shape item kinds and a shared leaf vocabulary:
 
 - Items: `Newtype`, `Struct`, `Enumeration`, `Alias`.
@@ -38,8 +38,8 @@ deliberately out of scope for this text-free Core — see `ARCHITECTURE.md`.
 
 ## Content identity
 
-`CoreItem::content_identity` hashes a value over its canonical portable-archive
-bytes under a layout-versioned `CoreLogosDomain`, with the NameTable excluded from
+`EncodedItem::content_identity` hashes a value over its canonical portable-archive
+bytes under a layout-versioned `EncodedLogosDomain`, with the NameTable excluded from
 the pre-image. So a rename is hash-stable by construction, and a structural edit
 moves the identity. The NameTable is one continuous identifier space extending the
 schema NameTable (`name_table::NameTable::extend_from`).
