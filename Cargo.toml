@@ -13,15 +13,15 @@ name = "core_logos"
 path = "src/lib.rs"
 
 [dependencies]
-content-identity = { git = "https://github.com/LiGoldragon/content-identity.git", rev = "6cc0408cdb96f174cc8fdf6ca23420038de28450" }
-name-table       = { git = "https://github.com/LiGoldragon/name-table.git", rev = "c3237f77c087e6feab49d6cf34971cebc14a11e6" }
+content-identity = { git = "https://github.com/LiGoldragon/protos.git", rev = "18ae746857979c9c01c0d4b315bb8a818056cf09" }
+name-table       = { git = "https://github.com/LiGoldragon/protos.git", rev = "18ae746857979c9c01c0d4b315bb8a818056cf09" }
 rkyv             = { version = "0.8", default-features = false, features = ["std", "bytecheck", "little_endian", "pointer_width_32", "unaligned"] }
 thiserror        = "2"
 
 [dev-dependencies]
-core-schema      = { git = "https://github.com/LiGoldragon/core-schema.git", rev = "2e47dec55e87eed08e7c4acfc1b8d576b303859c" }
-structural-codec = { git = "https://github.com/LiGoldragon/structural-codec.git", rev = "8ca0418dfa0b2e403833201d10f527fbad38f299" }
-raw-discovery    = { git = "https://github.com/LiGoldragon/raw-discovery.git", rev = "a4e8c6df84e6a487ca6fe2f3641f9bafd0b0d8c8" }
+core-schema      = { git = "https://github.com/LiGoldragon/core-schema.git", rev = "874e2ef1929936b72604f16d9e1b8928f8aa145e" }
+structural-codec = { git = "https://github.com/LiGoldragon/protos.git", rev = "18ae746857979c9c01c0d4b315bb8a818056cf09" }
+raw-discovery    = { git = "https://github.com/LiGoldragon/protos.git", rev = "18ae746857979c9c01c0d4b315bb8a818056cf09" }
 
 [lints.rust]
 unsafe_code = "forbid"
