@@ -16,7 +16,6 @@
 //! `LogosStandard` slices. Borrowed identifiers keep their enum-variant `u16` values;
 //! no source slice is copied or re-numbered.
 
-pub mod alias;
 pub mod attribute;
 pub mod const_item;
 pub mod domain;
@@ -39,7 +38,6 @@ pub mod type_reference;
 pub mod use_import;
 pub mod visibility;
 
-pub use alias::Alias;
 pub use attribute::{
     Attribute, ConfigurationAttribute, ConfigurationPredicate, DeriveGroup, HelperDerive,
 };

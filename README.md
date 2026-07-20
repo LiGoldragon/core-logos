@@ -27,7 +27,7 @@ Rendering Logos to and from Rust text is the job of a later sibling crate,
 `EncodedItem` is a closed enum — exhaustively matched, no wildcard arms — over four
 data-shape item kinds and a shared leaf vocabulary:
 
-- Items: `Newtype`, `Struct`, `Enumeration`, `Alias`.
+- Items: `Newtype`, `Struct`, `Enumeration`.
 - Leaves: `Visibility`, `Attribute` (`Derive` / `Configuration` / `ToolPath` /
   `HelperDerive`), `TypeReference` / `TypeApplication`, `PathNode`, `Field`,
   `Variant` / `VariantPayload`, `Generics` / `GenericParameter`, and the

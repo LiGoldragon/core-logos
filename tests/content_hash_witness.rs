@@ -23,14 +23,13 @@ use core_logos::EncodedLogosDomain;
 use name_table::NameTable;
 
 /// The content identity of the `CommitSequence` golden newtype under the current
-/// EncodedLogos layout, as a lowercase hex blake3 digest. Pinned at layout 7, the
-/// version that changes every stored identifier from a flat value to a namespaced
-/// `u16` enum variant. `commit_sequence` keeps the same Rust-shaped projection, but
-/// its archived bytes change with that encoded identifier representation. The value
-/// is deterministic because the fixture interns into the Logos slice in one fixed
-/// order.
-const COMMIT_SEQUENCE_IDENTITY_LAYOUT_7: &str =
-    "3f2d85f564a74df7962f4e9a110fdab92b1dc1899edd8f418314e254f285e73d";
+/// EncodedLogos layout, as a lowercase hex blake3 digest. Pinned at layout 8,
+/// which removes transparent type aliases from `EncodedItem`. Even this newtype's
+/// archived enum representation changes when the closed item algebra changes. The
+/// value is deterministic because the fixture interns into the Logos slice in one
+/// fixed order.
+const COMMIT_SEQUENCE_IDENTITY_LAYOUT_8: &str =
+    "d8aaeaad9fc85ab23c023448034581edbb411062d813141883ccbff6e7454fe2";
 
 #[test]
 fn commit_sequence_identity_is_pinned_under_the_current_layout() {
@@ -39,7 +38,7 @@ fn commit_sequence_identity_is_pinned_under_the_current_layout() {
     // definition and must be re-derived deliberately.
     assert_eq!(
         EncodedLogosDomain::layout_version().value(),
-        7,
+        8,
         "the witnessed layout version moved; re-derive the pinned hash deliberately",
     );
 
@@ -49,7 +48,7 @@ fn commit_sequence_identity_is_pinned_under_the_current_layout() {
 
     assert_eq!(
         identity.to_hexadecimal(),
-        COMMIT_SEQUENCE_IDENTITY_LAYOUT_7,
+        COMMIT_SEQUENCE_IDENTITY_LAYOUT_8,
         "the archived representation of CommitSequence changed — this is a layout \
          event: bump EncodedLogosDomain's LayoutVersion in src/domain.rs, document why \
          the archived shape moved, and update this constant deliberately",

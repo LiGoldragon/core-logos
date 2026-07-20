@@ -1,6 +1,5 @@
 //! The closed EncodedItem algebra and its content identity.
 
-use crate::alias::Alias;
 use crate::attribute::Attribute;
 use crate::const_item::Const;
 use crate::domain::EncodedLogosDomain;
@@ -32,7 +31,6 @@ pub enum EncodedItem {
     Newtype(Newtype),
     Struct(Struct),
     Enumeration(Enumeration),
-    Alias(Alias),
     ImplBlock(ImplBlock),
     Function(Function),
     Use(Use),
@@ -51,7 +49,6 @@ impl EncodedItem {
             EncodedItem::Newtype(newtype) => Some(newtype.name),
             EncodedItem::Struct(structure) => Some(structure.name),
             EncodedItem::Enumeration(enumeration) => Some(enumeration.name),
-            EncodedItem::Alias(alias) => Some(alias.name),
             EncodedItem::Function(function) => Some(function.name),
             EncodedItem::Const(const_item) => Some(const_item.name),
             EncodedItem::Module(module) => Some(module.name),
@@ -74,7 +71,6 @@ impl EncodedItem {
             EncodedItem::Newtype(newtype) => newtype.visibility = visibility,
             EncodedItem::Struct(structure) => structure.visibility = visibility,
             EncodedItem::Enumeration(enumeration) => enumeration.visibility = visibility,
-            EncodedItem::Alias(alias) => alias.visibility = visibility,
             EncodedItem::Function(function) => function.visibility = visibility,
             EncodedItem::Const(const_item) => const_item.visibility = visibility,
             EncodedItem::Module(module) => module.visibility = visibility,
@@ -93,7 +89,6 @@ impl EncodedItem {
             EncodedItem::Newtype(newtype) => &newtype.attributes,
             EncodedItem::Struct(structure) => &structure.attributes,
             EncodedItem::Enumeration(enumeration) => &enumeration.attributes,
-            EncodedItem::Alias(alias) => &alias.attributes,
             EncodedItem::ImplBlock(impl_block) => &impl_block.attributes,
             EncodedItem::Function(function) => &function.attributes,
             EncodedItem::Use(use_import) => &use_import.attributes,

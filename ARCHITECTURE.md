@@ -70,11 +70,10 @@ distinct while one component view resolves all three.
 
 ## Scope: which item kinds this encoded form carries, and why
 
-The accepted Rust-lowering ontology (`reports/logos/logos-rust-lowering-v1.md`)
-names seven item kinds: `Newtype`, `Struct`, `Enumeration`, `Alias`,
-`TraitDefinition`, `ImplBlock`, `FreeMethod`. This crate carries the
-**wire-contract data subset** — `Newtype`, `Struct`, `Enumeration`, `Alias`, plus
-the leaf vocabulary (attributes, visibility, paths, generics by kind) — **and
+The encoded-form item algebra excludes transparent aliases: each identifier has
+one canonical name, and projection does not emit a Rust type alias. This crate
+carries the **wire-contract data subset** — `Newtype`, `Struct`, `Enumeration`,
+plus the leaf vocabulary (attributes, visibility, paths, generics by kind) — **and
 `ImplBlock` and `Function`** (the ontology's `FreeMethod`, modeled as one node that
 serves both an impl member and a free function), **`Use`** (the `use`-import
 shape at the head of every generated module), and — from the layout-3 kernel
@@ -338,6 +337,6 @@ cache authority stay separate: the lock file carries the revisions, and
 One concern per file under `src/`: the closed `item` algebra and its content
 identity; one file per leaf family (`attribute`, `type_reference`, `generics`,
 `path`, `visibility`, `field`); one file per item kind (`newtype`, `structure`,
-`enumeration`, `alias`); the `domain` marker and the crate `error`. Tests live
+`enumeration`); the `domain` marker and the crate `error`. Tests live
 under `tests/`, one file per behavior, with the golden-pair fixtures in
 `tests/support`.

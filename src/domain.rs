@@ -13,6 +13,10 @@ impl HashDomain for EncodedLogosDomain {
     fn separation() -> DomainSeparation {
         DomainSeparation::Contextual {
             context: "core-logos 2026 stringless encoded-form algebra of logos",
+            // Layout 8 removes the transparent Rust type-alias item. Its removal changes
+            // the `EncodedItem` enum representation, so it must not share a content
+            // hash layout with values that admitted that item.
+            //
             // Layout 7 adopts namespace-variant encoded identifiers. Every
             // EncodedItem holds identifiers, so replacing the former flat identity
             // representation with `Schema(u16)`, `Logos(u16)`, and
@@ -46,12 +50,13 @@ impl HashDomain for EncodedLogosDomain {
             //     bodies construct);
             //   * Layout 7 hashes namespace-variant `u16` identifiers and the
             //     corresponding slice-composition boundary.
+            //   * Layout 8 removes transparent type aliases from the item algebra.
             //
             // Any future archived-representation change — max-variant growth,
             // discriminant reordering, or field layout — moves hashes and demands a
             // deliberate bump, witnessed by the golden-hash constant in
             // `tests/content_hash_witness.rs`.
-            layout: LayoutVersion::new(7),
+            layout: LayoutVersion::new(8),
         }
     }
 }
