@@ -77,6 +77,8 @@ enum LogosTextError {
     #[error(transparent)]
     SingleChunk(#[from] structural_codec::error::SingleChunkRequired),
     #[error(transparent)]
+    NamedChunk(#[from] structural_codec::error::NamedChunkRequired),
+    #[error(transparent)]
     Names(#[from] NameTableError),
     #[error("the source held no root object to decode")]
     EmptySource,
@@ -100,7 +102,7 @@ struct Lexicon {
 
 impl Lexicon {
     fn build() -> Self {
-        let mut names = NameTable::new();
+        let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
         let mut keyword = |text: &str| names.intern(Name::new(text));
         let newtype = keyword("Newtype");
         let tool_path = keyword("ToolPath");
@@ -589,7 +591,9 @@ impl TextualLogos {
                     )))),
                 ),
             ),
-            None => StructuralValue::chosen(PATH_SINGLE, StructuralValue::Atom(Identifier::new(0))),
+            None => {
+                StructuralValue::chosen(PATH_SINGLE, StructuralValue::Atom(Identifier::Logos(0)))
+            }
         }
     }
 
@@ -718,7 +722,7 @@ impl Textual for TextualLogos {
 #[test]
 fn golden_commit_sequence_round_trips_through_the_organs() {
     let mouth = TextualLogos::build();
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let golden = support::commit_sequence(&mut names);
 
     // view: the EncodedForm value -> canonical Protos text through the organs. Text

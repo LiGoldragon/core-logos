@@ -9,7 +9,7 @@ use name_table::NameTable;
 
 #[test]
 fn the_preamble_is_three_ordered_entries() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = support::commit_sequence(&mut names);
     let attributes = item.attributes();
 
@@ -21,7 +21,7 @@ fn the_preamble_is_three_ordered_entries() {
 
 #[test]
 fn attribute_order_round_trips_through_portable_archive() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = support::commit_sequence(&mut names);
     let original = item.attributes().to_vec();
 
@@ -33,7 +33,7 @@ fn attribute_order_round_trips_through_portable_archive() {
 
 #[test]
 fn reordering_attributes_moves_content_identity() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = support::commit_sequence(&mut names);
     let before = item.content_identity().expect("hash");
 
@@ -48,6 +48,6 @@ fn reordering_attributes_moves_content_identity() {
     assert_ne!(
         before.bytes(),
         after.bytes(),
-        "attribute order is part of the Core value",
+        "attribute order is part of the encoded form value",
     );
 }

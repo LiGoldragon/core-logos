@@ -6,10 +6,10 @@ use core_logos::{EncodedItem, TypeReference, Visibility};
 use name_table::NameTable;
 
 /// Print the interned NameTable rows — the continuous identifier space backing the
-/// stringless Core value.
+/// stringless encoded form value.
 fn show_rows(names: &NameTable) {
     for index in 0..names.len() {
-        let identifier = name_table::Identifier::new(index as u32);
+        let identifier = name_table::Identifier::Logos(index as u16);
         let name = names.resolve(identifier).expect("known identifier");
         println!("  [{index}] {}", name.as_str());
     }
@@ -17,7 +17,7 @@ fn show_rows(names: &NameTable) {
 
 #[test]
 fn the_commit_sequence_fixture_is_a_public_newtype_with_the_full_preamble() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = support::commit_sequence(&mut names);
 
     let EncodedItem::Newtype(newtype) = &item else {
@@ -44,7 +44,7 @@ fn the_commit_sequence_fixture_is_a_public_newtype_with_the_full_preamble() {
 
 #[test]
 fn the_database_marker_fixture_carries_visibility_as_data_at_field_level() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = support::database_marker(&mut names);
 
     let EncodedItem::Struct(structure) = &item else {

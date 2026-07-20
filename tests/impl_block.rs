@@ -1,5 +1,5 @@
 //! The impl-block and function item kinds archive and content-address like every
-//! other Core item: a portable-archive round-trip is identity, and a structural edit
+//! other encoded form item: a portable-archive round-trip is identity, and a structural edit
 //! to a body expression moves the content identity.
 
 mod support;
@@ -12,7 +12,7 @@ use core_logos::{
 };
 use name_table::NameTable;
 
-/// Build the `Topic` inherent impl block as a stringless Core value:
+/// Build the `Topic` inherent impl block as a stringless encoded form value:
 ///
 /// ```ignore
 /// impl Topic {
@@ -120,7 +120,7 @@ fn topic_impl(names: &mut NameTable) -> EncodedItem {
 
 #[test]
 fn an_impl_block_round_trips_through_portable_archive() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = topic_impl(&mut names);
 
     let bytes = item.to_archive_bytes().expect("serialize");
@@ -131,7 +131,7 @@ fn an_impl_block_round_trips_through_portable_archive() {
 
 #[test]
 fn an_impl_block_has_no_declared_name_but_carries_its_attributes() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = topic_impl(&mut names);
 
     assert_eq!(item.name(), None, "an impl block declares no name");
@@ -140,7 +140,7 @@ fn an_impl_block_has_no_declared_name_but_carries_its_attributes() {
 
 #[test]
 fn editing_a_body_expression_moves_the_impl_block_identity() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = topic_impl(&mut names);
     let before = item.content_identity().expect("hash");
 
@@ -169,7 +169,7 @@ fn editing_a_body_expression_moves_the_impl_block_identity() {
 /// A free function is a `EncodedItem::Function`, not only an impl member.
 #[test]
 fn a_free_function_is_a_named_content_addressable_item() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let value = support::identifier(&mut names, "value");
     let name = support::identifier(&mut names, "identity");
     let string = support::path(&mut names, &["String"]);

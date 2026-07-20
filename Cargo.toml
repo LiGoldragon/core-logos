@@ -1,11 +1,11 @@
 [package]
 name         = "core-logos"
-version      = "0.2.0"
+version      = "0.3.0"
 edition      = "2024"
 rust-version = "1.85"
 license      = "MIT OR Apache-2.0"
 repository   = "https://github.com/LiGoldragon/core-logos"
-description  = "The stringless Core algebra of Logos: a closed EncodedItem data language 1-to-1 with Rust at the Core, text-free, PortableArchive, content-addressed with a NameTable-excluded identity. The TextualRust codec is a later sibling crate."
+description  = "The stringless encoded-form algebra of Logos: a closed EncodedItem data language 1-to-1 with Rust in encoded form, text-free, PortableArchive, content-addressed with a NameTable-excluded identity. The TextualRust codec is a later sibling crate."
 publish      = false
 
 [lib]
@@ -13,15 +13,15 @@ name = "core_logos"
 path = "src/lib.rs"
 
 [dependencies]
-content-identity = { git = "https://github.com/LiGoldragon/protos.git", rev = "f12a80c85d9d27ac4432b86b7d3095e8387c6fa9" }
-name-table       = { git = "https://github.com/LiGoldragon/protos.git", rev = "f12a80c85d9d27ac4432b86b7d3095e8387c6fa9" }
+content-identity = { git = "https://github.com/LiGoldragon/protos.git", rev = "a591162507bc00f8971507826870d93c3ef50d1e" }
+name-table       = { git = "https://github.com/LiGoldragon/protos.git", rev = "a591162507bc00f8971507826870d93c3ef50d1e" }
 rkyv             = { version = "0.8", default-features = false, features = ["std", "bytecheck", "little_endian", "pointer_width_32", "unaligned"] }
 thiserror        = "2"
 
 [dev-dependencies]
-core-schema      = { git = "https://github.com/LiGoldragon/core-schema.git", rev = "1122370fbe3f65c56957431714a19c3920365466" }
-structural-codec = { git = "https://github.com/LiGoldragon/protos.git", rev = "f12a80c85d9d27ac4432b86b7d3095e8387c6fa9" }
-raw-discovery    = { git = "https://github.com/LiGoldragon/protos.git", rev = "f12a80c85d9d27ac4432b86b7d3095e8387c6fa9" }
+core-schema      = { git = "https://github.com/LiGoldragon/core-schema.git", rev = "f3167f4ad54bcdb2223014f0309a67253df92152" }
+structural-codec = { git = "https://github.com/LiGoldragon/protos.git", rev = "a591162507bc00f8971507826870d93c3ef50d1e" }
+raw-discovery    = { git = "https://github.com/LiGoldragon/protos.git", rev = "a591162507bc00f8971507826870d93c3ef50d1e" }
 
 [lints.rust]
 unsafe_code = "forbid"

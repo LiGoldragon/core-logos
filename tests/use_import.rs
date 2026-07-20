@@ -1,4 +1,4 @@
-//! The use-import item kind archives and content-addresses like every other Core
+//! The use-import item kind archives and content-addresses like every other encoded form
 //! item: a portable-archive round-trip is identity, it declares no name but carries
 //! its attributes, and a structural edit to its import group moves the identity.
 
@@ -8,7 +8,7 @@ use content_identity::PortableArchive;
 use core_logos::{Attribute, ConfigurationPredicate, EncodedItem, Use, Visibility};
 use name_table::NameTable;
 
-/// Build the golden NOTA import as a stringless Core value:
+/// Build the golden NOTA import as a stringless encoded form value:
 ///
 /// ```ignore
 /// #[rustfmt::skip]
@@ -36,7 +36,7 @@ fn nota_import(names: &mut NameTable) -> EncodedItem {
 
 #[test]
 fn a_use_import_round_trips_through_portable_archive() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = nota_import(&mut names);
 
     let bytes = item.to_archive_bytes().expect("serialize");
@@ -47,7 +47,7 @@ fn a_use_import_round_trips_through_portable_archive() {
 
 #[test]
 fn a_use_import_declares_no_name_but_carries_its_attributes() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = nota_import(&mut names);
 
     assert_eq!(item.name(), None, "a use import declares no name");
@@ -60,7 +60,7 @@ fn a_use_import_declares_no_name_but_carries_its_attributes() {
 
 #[test]
 fn editing_the_import_group_moves_the_use_identity() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = nota_import(&mut names);
     let before = item.content_identity().expect("hash");
 
@@ -82,7 +82,7 @@ fn editing_the_import_group_moves_the_use_identity() {
 
 #[test]
 fn stamping_visibility_lands_on_a_use_import() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = nota_import(&mut names).with_visibility(Visibility::Private);
     let EncodedItem::Use(use_import) = item else {
         panic!("use import");

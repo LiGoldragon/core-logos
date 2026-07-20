@@ -1,7 +1,7 @@
 //! # core-logos
 //!
-//! The stringless Core algebra of Logos — the Rust-equivalent data language,
-//! 1-to-1 with Rust at the Core. This crate is **text-free**: it depends on no
+//! The stringless encoded form algebra of Logos — the Rust-equivalent data language,
+//! 1-to-1 with Rust at the encoded form. This crate is **text-free**: it depends on no
 //! `syn`, `prettyplease`, `quote`, or proc-macro machinery. Every identifier is an
 //! [`name_table::Identifier`] into a NameTable; paths are segment vectors of
 //! identifiers. The `::`, the `<>`, the `pub` keyword, and snake_case field names
@@ -12,8 +12,9 @@
 //! vocabulary. Content identity ([`EncodedItem::content_identity`]) is computed over a
 //! value's portable-archive bytes under [`EncodedLogosDomain`], with the NameTable
 //! excluded — so a rename is hash-stable and a structural edit moves the identity.
-//! The NameTable is one continuous identifier space extending the schema NameTable
-//! (via [`name_table::NameTable::extend_from`]).
+//! A Logos NameTable owns its `Logos` slice and composes read-only `Schema` and
+//! `LogosStandard` slices. Borrowed identifiers keep their enum-variant `u16` values;
+//! no source slice is copied or re-numbered.
 
 pub mod alias;
 pub mod attribute;
@@ -28,9 +29,11 @@ pub mod generics;
 pub mod impl_block;
 pub mod item;
 pub mod module;
+pub mod name_boundary;
 pub mod newtype;
 pub mod path;
 pub mod pattern;
+pub mod standard;
 pub mod structure;
 pub mod type_reference;
 pub mod use_import;
@@ -56,9 +59,16 @@ pub use generics::{GenericParameter, Generics, LifetimeParameter, TypeParameter}
 pub use impl_block::{AssociatedType, ImplBlock, ImplItem};
 pub use item::EncodedItem;
 pub use module::Module;
+pub use name_boundary::{LogosNameBoundary, NameDerivation};
 pub use newtype::Newtype;
 pub use path::PathNode;
 pub use pattern::{Pattern, PatternElement, TupleVariantPattern};
+pub use standard::{
+    ARCHIVE, BOOLEAN, BYTES, CLONE, COPY, DEBUG, DESERIALIZE, EQ, INTEGER, MAP, NOTA,
+    NOTA_DECODE_ERROR, NOTA_ENCODE, NOTA_SOURCE, NOTA_TEXT_FEATURE, OPTIONAL, PARTIAL_EQ, PATH,
+    RUST_BOOLEAN, RUSTFMT, SCOPE_OF, SERIALIZE, SKIP, STANDARD_LIBRARY, STRING, STRING_MODULE,
+    StandardIdentifier, UNSIGNED_64, VECTOR, standard_name_table,
+};
 pub use structure::Struct;
 pub use type_reference::{
     ImplTraitType, ReferenceMutability, ReferenceType, SliceType, TupleType, TypeApplication,

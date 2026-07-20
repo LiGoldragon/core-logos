@@ -88,7 +88,7 @@ checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 [[package]]
 name = "content-identity"
 version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/protos.git?rev=f12a80c85d9d27ac4432b86b7d3095e8387c6fa9#f12a80c85d9d27ac4432b86b7d3095e8387c6fa9"
+source = "git+https://github.com/LiGoldragon/protos.git?rev=a591162507bc00f8971507826870d93c3ef50d1e#a591162507bc00f8971507826870d93c3ef50d1e"
 dependencies = [
  "blake3",
  "rkyv",
@@ -97,7 +97,7 @@ dependencies = [
 
 [[package]]
 name = "core-logos"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "content-identity",
  "core-schema",
@@ -110,8 +110,8 @@ dependencies = [
 
 [[package]]
 name = "core-schema"
-version = "0.4.0"
-source = "git+https://github.com/LiGoldragon/core-schema.git?rev=1122370fbe3f65c56957431714a19c3920365466#1122370fbe3f65c56957431714a19c3920365466"
+version = "0.5.0"
+source = "git+https://github.com/LiGoldragon/core-schema.git?rev=f3167f4ad54bcdb2223014f0309a67253df92152#f3167f4ad54bcdb2223014f0309a67253df92152"
 dependencies = [
  "content-identity",
  "name-table",
@@ -221,8 +221,8 @@ dependencies = [
 
 [[package]]
 name = "name-table"
-version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/protos.git?rev=f12a80c85d9d27ac4432b86b7d3095e8387c6fa9#f12a80c85d9d27ac4432b86b7d3095e8387c6fa9"
+version = "0.2.0"
+source = "git+https://github.com/LiGoldragon/protos.git?rev=a591162507bc00f8971507826870d93c3ef50d1e#a591162507bc00f8971507826870d93c3ef50d1e"
 dependencies = [
  "content-identity",
  "rkyv",
@@ -291,7 +291,7 @@ dependencies = [
 [[package]]
 name = "raw-discovery"
 version = "0.1.0"
-source = "git+https://github.com/LiGoldragon/protos.git?rev=f12a80c85d9d27ac4432b86b7d3095e8387c6fa9#f12a80c85d9d27ac4432b86b7d3095e8387c6fa9"
+source = "git+https://github.com/LiGoldragon/protos.git?rev=a591162507bc00f8971507826870d93c3ef50d1e#a591162507bc00f8971507826870d93c3ef50d1e"
 dependencies = [
  "content-identity",
  "rkyv",
@@ -363,8 +363,8 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "structural-codec"
-version = "0.3.0"
-source = "git+https://github.com/LiGoldragon/protos.git?rev=f12a80c85d9d27ac4432b86b7d3095e8387c6fa9#f12a80c85d9d27ac4432b86b7d3095e8387c6fa9"
+version = "0.4.0"
+source = "git+https://github.com/LiGoldragon/protos.git?rev=a591162507bc00f8971507826870d93c3ef50d1e#a591162507bc00f8971507826870d93c3ef50d1e"
 dependencies = [
  "content-identity",
  "name-table",

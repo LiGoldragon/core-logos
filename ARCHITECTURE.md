@@ -1,13 +1,13 @@
 # core-logos architecture
 
 `core-logos` is slice three of the psyche-authorized language-family proof of
-concept: the stringless Core algebra of Logos, the Rust-equivalent data language.
+concept: the stringless encoded form algebra of Logos, the Rust-equivalent data language.
 This document records the durable direction — the rulings the crate embodies and
 the boundaries it holds — for an agent entering the repository.
 
-## The one ruling that shapes everything: 1-to-1 with Rust, at the Core
+## The one ruling that shapes everything: 1-to-1 with Rust, at the encoded form
 
-Logos is 1-to-1 with Rust at the Core. Every token of Rust meaning is stored data
+Logos is 1-to-1 with Rust at the encoded form. Every token of Rust meaning is stored data
 in a EncodedLogos value; nothing is materialized at projection. Concretely:
 
 - The field **name is always present** as a stored `Identifier`. Text elision (a
@@ -26,12 +26,12 @@ in a EncodedLogos value; nothing is materialized at projection. Concretely:
 ## The text-free boundary
 
 This crate depends on no `syn`, `prettyplease`, `quote`, or proc-macro machinery.
-Core never depends on text. The TextualRust codec — `syn` decode and
+encoded form never depends on text. The TextualRust codec — `syn` decode and
 `prettyplease` encode against the schema-rust goldens — is a **later sibling
-crate**. It reads and writes EncodedLogos; it does not live here. Keeping the Core
-text-free is what lets the same Core be viewed through many textual forms
+crate**. It reads and writes EncodedLogos; it does not live here. Keeping the encoded form
+text-free is what lets the same encoded form be viewed through many textual forms
 (TextualLogos, TextualRust, and future emission languages) without any of them
-reaching into the Core.
+reaching into the encoded form.
 
 Stringlessness is total: every identifier is a `name_table::Identifier`; paths are
 segment vectors of identifiers (dotted in any text form; `::` materializes only at
@@ -45,23 +45,30 @@ the TextualRust sibling, not here.
 `EncodedItem::content_identity` is `ContentHash::of_core` under `EncodedLogosDomain`, a
 `Contextual` hash domain tagged with `LayoutVersion(4)` (see "Content identity and
 layout version" below for why layout 4). The pre-image is the value's canonical
-portable-archive bytes; the NameTable is excluded (it is not part of a Core value).
+portable-archive bytes; the NameTable is excluded (it is not part of a encoded form value).
 Two invariants follow and are tested:
 
-- **Rename is hash-stable.** The Core carries the identifier, never the string, so
+- **Rename is hash-stable.** The encoded form carries the identifier, never the string, so
   changing what a name projects to does not move the identity.
 - **A structural edit moves the identity.** Changing a wrapped type, a visibility,
-  or attribute order changes the Core value and therefore its hash.
+  or attribute order changes the encoded form value and therefore its hash.
 
-## One continuous identifier space
+## Composed identifier slices and the Logos standard vocabulary
 
-The logos NameTable extends the schema NameTable via `name_table::extend_from`: the
-logos table is a higher-index append-extension of the schema table, so a
-carried-over schema identifier keeps its exact index. The continuity test builds a
-core-schema-populated table and proves existing indices stay stable while new
-logos names append above the base.
+A Logos NameTable owns only its `Logos(u16)` append slice. It composes completed,
+read-only `Schema(u16)` and `LogosStandard(u16)` slices, retaining each borrowed
+identifier exactly and never copying, re-numbering, or `extend_from`-cloning a
+source table. The `LogosStandard` slice contains only fixed, schema-independent
+vocabulary. `src/standard.rs` holds that vocabulary once and generates both the
+compiled identifier constants and the content-identifiable standard NameTable slice.
 
-## Scope: which item kinds this Core carries, and why
+`LogosNameBoundary` is the eager derivation boundary: it resolves source identifiers
+from the composed table, derives any spelling, and allocates that result only in the
+owned `Logos` slice. No typed schema-to-Logos transform reads or creates a string.
+The boundary tests prove that `Schema(0)`, `LogosStandard(0)`, and `Logos(0)` remain
+distinct while one component view resolves all three.
+
+## Scope: which item kinds this encoded form carries, and why
 
 The accepted Rust-lowering ontology (`reports/logos/logos-rust-lowering-v1.md`)
 names seven item kinds: `Newtype`, `Struct`, `Enumeration`, `Alias`,
@@ -151,7 +158,7 @@ Every choice below the psyche rulings is a revisable lean with a stated trigger:
 - **String-literal content is stored data, not an interned name.** A name is
   interned and excluded from content identity (rename-stable); a string literal's
   content is semantic and is hashed as part of the value, so `Expression::StringLiteral`
-  carries a `String`. This is the one place a Core value holds owned text, and it is
+  carries a `String`. This is the one place a encoded form value holds owned text, and it is
   literal-value data, not the raw-token-text escape hatch the text-free boundary
   forbids. *Trigger:* if a projection ever needs to intern literal content, revisit.
 - **Reference mutability is modeled; `&mut self` is not.** The layout-3 growth added
@@ -163,7 +170,7 @@ Every choice below the psyche rulings is a revisable lean with a stated trigger:
 - **Integer literals are value-plus-representation, never stored text.** An
   `IntegerLiteral` carries a `u128` value and a closed `IntegerRepresentation`
   (`Decimal`, or `Hexadecimal { minimum_digits }` for the zero-padded `0x…` form),
-  so `0x0001000000000000` round-trips byte-exact without the Core holding raw token
+  so `0x0001000000000000` round-trips byte-exact without the encoded form holding raw token
   text — the stringless boundary holds and the string-literal exception below stays
   the *only* owned-text field. The hexadecimal form is **lowercase** (the goldens'
   digits are `0`/`1`, case-agnostic). *Trigger:* a witnessed literal needs uppercase
@@ -197,7 +204,7 @@ Every choice below the psyche rulings is a revisable lean with a stated trigger:
 
 **The layout is 2, and the correction below records why.** An earlier version of
 this document claimed that adding item kinds was "append-only" enum growth under
-which "every pre-existing Core value archives to byte-identical bytes and its
+which "every pre-existing encoded form value archives to byte-identical bytes and its
 content identity does not move," and concluded that `LayoutVersion(1)` should be
 kept. **That reasoning was wrong, and the claim was false.** The commit messages
 that shipped the growth are history and stand; this document must tell the truth,
@@ -298,6 +305,24 @@ fields, so the new field enlarged every `Newtype` value's archived bytes and, be
 `tests/content_hash_witness.rs` pins the new absolute hash deliberately. Consumers
 (the signal-sema-storage seam) cross this hash boundary and must re-converge across
 layout 4 only via the deliberate cascade slice, never casually.
+
+### Layouts 5 through 7: exchange vocabulary and identifier slicing
+
+**The layout is now 7.** Layout 5 added the ordinary-exchange codec-body
+vocabulary; layout 6 added the envelope `StructLiteral` expression. Both grow
+archived enum layouts and therefore move every affected identity under rkyv.
+
+Layout 7 replaces the former flat identifier representation with the closed
+namespace enum carrying a `u16` local. Every encoded Logos item carries identifiers,
+so this is an archive and content-identity boundary even when a projected Rust item
+is unchanged. The producer ships the fixed `LogosStandard` vocabulary as its own
+NameTable slice and generated typed constants. A component then composes read-only
+schema and standard slices with its owned Logos slice; no source names are copied or
+renumbered. `tests/content_hash_witness.rs` pins the layout-7 identity deliberately.
+
+Consumers must re-pin through the ordered producer cascade. Persisted encoded Logos
+values are regenerated under the accepted clean-break policy; no flat-id compatibility
+reader is retained.
 
 ## Release-train status
 

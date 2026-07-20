@@ -3,17 +3,25 @@
 use content_identity::{DomainSeparation, HashDomain, LayoutVersion};
 
 /// The layout-versioned hash domain for every EncodedLogos value. The domain carries
-/// the layout version in the type, so "which Core layout" is never a
+/// the layout version in the type, so "which encoded form layout" is never a
 /// hand-remembered suffix. The NameTable is excluded from every EncodedLogos
-/// pre-image (it is not part of a Core value), so a rename is hash-stable by
+/// pre-image (it is not part of a encoded form value), so a rename is hash-stable by
 /// construction and a structural edit moves the identity.
 pub struct EncodedLogosDomain;
 
 impl HashDomain for EncodedLogosDomain {
     fn separation() -> DomainSeparation {
         DomainSeparation::Contextual {
-            context: "core-logos 2026 stringless core algebra of logos",
-            // Layout 6 adds the ordinary-exchange envelope vocabulary. The
+            context: "core-logos 2026 stringless encoded-form algebra of logos",
+            // Layout 7 adopts namespace-variant encoded identifiers. Every
+            // EncodedItem holds identifiers, so replacing the former flat identity
+            // representation with `Schema(u16)`, `Logos(u16)`, and
+            // `LogosStandard(u16)` changes its archived representation even when
+            // its Rust-shaped data is otherwise identical. The break is deliberate:
+            // the composed NameTable model prevents schema-size-dependent standard
+            // identifiers and keeps source slices independent.
+            //
+            // Layout 6 added the ordinary-exchange envelope vocabulary. The
             // `Expression` algebra grew the `StructLiteral` node (the
             // `FrameBody::Request { exchange, request }` bodies `into_frame` /
             // `into_reply_frame` construct), and a struct-literal field is a
@@ -35,13 +43,15 @@ impl HashDomain for EncodedLogosDomain {
             //     wildcard-pattern nodes the frame encode/decode bodies exercise);
             //   * Layout 6 hashes the ordinary-exchange envelope vocabulary (the
             //     `StructLiteral` expression node the `into_frame` / `into_reply_frame`
-            //     bodies construct).
+            //     bodies construct);
+            //   * Layout 7 hashes namespace-variant `u16` identifiers and the
+            //     corresponding slice-composition boundary.
             //
             // Any future archived-representation change — max-variant growth,
             // discriminant reordering, or field layout — moves hashes and demands a
             // deliberate bump, witnessed by the golden-hash constant in
             // `tests/content_hash_witness.rs`.
-            layout: LayoutVersion::new(6),
+            layout: LayoutVersion::new(7),
         }
     }
 }

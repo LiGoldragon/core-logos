@@ -214,7 +214,7 @@ pub struct MatchArm {
 /// string literal's content); the representation carries the exact Rust text the
 /// value projects to, so `0x0001000000000000` and `281474976710656` are the same
 /// value under different [`IntegerRepresentation`]s and each round-trips byte-exact
-/// without the Core ever holding raw token text.
+/// without the encoded form ever holding raw token text.
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct IntegerLiteral {
     pub value: u128,

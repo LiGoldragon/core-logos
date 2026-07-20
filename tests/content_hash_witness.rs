@@ -23,17 +23,14 @@ use core_logos::EncodedLogosDomain;
 use name_table::NameTable;
 
 /// The content identity of the `CommitSequence` golden newtype under the current
-/// EncodedLogos layout, as a lowercase hex blake3 digest. Pinned at layout 6, the
-/// version that adds the ordinary-exchange envelope vocabulary to the archived shape
-/// (the `Expression` algebra grew the `StructLiteral` node the `into_frame` /
-/// `into_reply_frame` bodies construct, enlarging the fixed-size `EncodedItem` archived
-/// bytes). `commit_sequence` uses none of the new nodes, so its projection is
-/// unchanged; only its archived bytes — and therefore this pinned digest — moved with
-/// the layout. The value is a deterministic function of the golden fixture:
-/// `commit_sequence` interns into a fresh NameTable in a fixed order, so the stored
-/// identifier indices — and thus the archived bytes — are reproducible.
-const COMMIT_SEQUENCE_IDENTITY_LAYOUT_6: &str =
-    "8553cb87a1be10e2c7634a913aba1c3fe4bf15840b649d5e39fec334a6667301";
+/// EncodedLogos layout, as a lowercase hex blake3 digest. Pinned at layout 7, the
+/// version that changes every stored identifier from a flat value to a namespaced
+/// `u16` enum variant. `commit_sequence` keeps the same Rust-shaped projection, but
+/// its archived bytes change with that encoded identifier representation. The value
+/// is deterministic because the fixture interns into the Logos slice in one fixed
+/// order.
+const COMMIT_SEQUENCE_IDENTITY_LAYOUT_7: &str =
+    "3f2d85f564a74df7962f4e9a110fdab92b1dc1899edd8f418314e254f285e73d";
 
 #[test]
 fn commit_sequence_identity_is_pinned_under_the_current_layout() {
@@ -42,17 +39,17 @@ fn commit_sequence_identity_is_pinned_under_the_current_layout() {
     // definition and must be re-derived deliberately.
     assert_eq!(
         EncodedLogosDomain::layout_version().value(),
-        6,
+        7,
         "the witnessed layout version moved; re-derive the pinned hash deliberately",
     );
 
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = support::commit_sequence(&mut names);
     let identity = item.content_identity().expect("content identity");
 
     assert_eq!(
         identity.to_hexadecimal(),
-        COMMIT_SEQUENCE_IDENTITY_LAYOUT_6,
+        COMMIT_SEQUENCE_IDENTITY_LAYOUT_7,
         "the archived representation of CommitSequence changed — this is a layout \
          event: bump EncodedLogosDomain's LayoutVersion in src/domain.rs, document why \
          the archived shape moved, and update this constant deliberately",

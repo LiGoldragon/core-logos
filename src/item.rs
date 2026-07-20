@@ -22,7 +22,7 @@ use name_table::Identifier;
 /// error until its handling is written — the algebra grows by design.
 ///
 /// The trait definition and free-method item kinds of the accepted ontology remain
-/// out of scope for this text-free Core (see the crate ARCHITECTURE). `ImplBlock`
+/// out of scope for this text-free encoded form (see the crate ARCHITECTURE). `ImplBlock`
 /// and `Function` are modeled: their bodies are the closed Tier-1 expression
 /// vocabulary the wire goldens exercise, carried as data. `Use` models the
 /// `use`-import shape — the cfg-gated NOTA import at the head of every generated

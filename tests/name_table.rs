@@ -1,54 +1,53 @@
-//! NameTable continuity: the logos identifier space extends a core-schema table
-//! as one continuous append-only space, keeping carried-over indices stable.
+//! NameTable composition between schema and Logos slices.
 
 mod support;
 
+use core_logos::LogosNameBoundary;
 use core_schema::FixtureFamily;
-use name_table::{Identifier, Name, NameTable};
+use name_table::{Identifier, IdentifierNamespace, Name, NameTable};
 
 #[test]
-fn extending_a_core_schema_table_keeps_existing_indices_stable() {
+fn composing_a_schema_slice_keeps_its_identifier_variant_and_allocates_only_logos_rows() {
     let family = FixtureFamily::build();
-    let base = family.universe().names();
-    let base_len = base.len();
+    let schema = family.universe().names();
+    let schema_len = schema.len();
     assert!(
-        base_len > 0,
-        "the core-schema fixture populates the base table"
+        schema_len > 0,
+        "the core-schema fixture populates its own slice"
     );
 
-    // Snapshot every base identifier's name.
-    let base_names: Vec<Name> = (0..base_len)
-        .map(|index| base.resolve(Identifier::new(index as u32)).unwrap().clone())
-        .collect();
+    let mut logos = NameTable::new(IdentifierNamespace::Logos)
+        .compose(schema)
+        .expect("a Logos table can borrow the Schema slice");
 
-    let mut logos = NameTable::extend_from(base);
-
-    // Every carried-over identifier resolves to the same name in the logos table.
-    for (index, name) in base_names.iter().enumerate() {
-        assert_eq!(logos.resolve(Identifier::new(index as u32)).unwrap(), name);
+    for index in 0..schema_len {
+        let identifier = Identifier::Schema(index as u16);
+        assert_eq!(
+            logos.resolve(identifier).unwrap(),
+            schema.resolve(identifier).unwrap()
+        );
     }
 
-    // Re-interning a carried-over name returns its original identifier — stable.
-    assert_eq!(logos.intern(base_names[0].clone()), Identifier::new(0));
-
-    // A new logos-only name appends above the schema space — one continuous space.
     let fresh = logos.intern(Name::new("LogosOnlyMarker"));
-    assert!(
-        fresh.value() as usize >= base_len,
-        "new identifiers append above the base table",
+    assert_eq!(fresh, Identifier::Logos(0));
+    assert_eq!(
+        logos.len(),
+        1,
+        "borrowed Schema rows are not copied into Logos"
     );
 }
 
 #[test]
-fn a_logos_item_built_over_the_extended_table_is_content_addressable() {
+fn a_logos_item_built_over_composed_slices_is_content_addressable() {
     let family = FixtureFamily::build();
-    let mut logos = NameTable::extend_from(family.universe().names());
+    let boundary = LogosNameBoundary::from_schema(family.universe().names())
+        .expect("compose schema and fixed Logos-standard slices");
+    let mut logos = boundary.into_names();
 
     let item = support::commit_sequence(&mut logos);
 
-    // A content identity computes over the extended, continuous table.
     item.content_identity()
-        .expect("content identity over the extended table");
+        .expect("content identity over a composed NameTable");
     assert_eq!(
         logos
             .resolve(item.name().expect("a newtype has a declared name"))
