@@ -28,7 +28,9 @@ fn composing_a_schema_slice_keeps_its_identifier_variant_and_allocates_only_logo
         );
     }
 
-    let fresh = logos.intern(Name::new("LogosOnlyMarker"));
+    let fresh = logos
+        .intern(Name::new("LogosOnlyMarker"))
+        .expect("allocate Logos-only marker");
     assert_eq!(fresh, Identifier::Logos(0));
     assert_eq!(
         logos.len(),

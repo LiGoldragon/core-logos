@@ -35,7 +35,7 @@ impl LogosNameBoundary {
     /// Compose the fixed Logos vocabulary and a completed schema name slice into a
     /// fresh Logos-owned table.
     pub fn from_schema(schema_names: &NameTable) -> Result<Self, NameTableError> {
-        let standards = standard_name_table();
+        let standards = standard_name_table()?;
         let names = NameTable::new(name_table::IdentifierNamespace::Logos)
             .compose(&standards)?
             .compose(schema_names)?;
@@ -54,7 +54,7 @@ impl LogosNameBoundary {
             NameDerivation::ScreamingSnakeCase => self.names.resolve(source)?.screaming(),
             NameDerivation::PascalCase => self.names.resolve(source)?.pascal_case(),
         };
-        Ok(self.names.intern(Name::new(derived)))
+        self.names.intern(Name::new(derived))
     }
 
     /// The composed one-NameTable view used by later projections.

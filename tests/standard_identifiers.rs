@@ -7,7 +7,7 @@ use name_table::{Identifier, IdentifierNamespace, Name, NameTable};
 
 #[test]
 fn generated_standard_constants_resolve_through_their_own_immutable_slice() {
-    let standards = standard_name_table();
+    let standards = standard_name_table().expect("build fixed standard slice");
 
     assert_eq!(INTEGER, Identifier::LogosStandard(0));
     assert_eq!(standards.namespace(), IdentifierNamespace::LogosStandard);
@@ -21,7 +21,9 @@ fn generated_standard_constants_resolve_through_their_own_immutable_slice() {
 #[test]
 fn boundary_borrows_schema_and_standard_slices_and_eagerly_allocates_only_logos_names() {
     let mut schema = NameTable::new(IdentifierNamespace::Schema);
-    let commit_sequence = schema.intern(Name::new("CommitSequence"));
+    let commit_sequence = schema
+        .intern(Name::new("CommitSequence"))
+        .expect("allocate CommitSequence");
     assert_eq!(commit_sequence, Identifier::Schema(0));
 
     let mut boundary = LogosNameBoundary::from_schema(&schema).unwrap();

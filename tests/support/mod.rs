@@ -14,14 +14,20 @@ pub fn path(names: &mut NameTable, segments: &[&str]) -> PathNode {
     PathNode {
         segments: segments
             .iter()
-            .map(|segment| names.intern(Name::new(*segment)))
+            .map(|segment| {
+                names
+                    .intern(Name::new(*segment))
+                    .expect("allocate fixed fixture path segment")
+            })
             .collect(),
     }
 }
 
 /// Intern a single name.
 pub fn identifier(names: &mut NameTable, name: &str) -> Identifier {
-    names.intern(Name::new(name))
+    names
+        .intern(Name::new(name))
+        .expect("allocate fixed fixture name")
 }
 
 /// The three-attribute golden preamble carried by every wire data item, as ordered

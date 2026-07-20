@@ -20,7 +20,7 @@ fn rename(original: &NameTable, target: Identifier, replacement: &str) -> NameTa
                 .expect("known identifier")
                 .clone()
         };
-        renamed.intern(name);
+        renamed.intern(name).expect("rebuild renamed table");
     }
     renamed
 }

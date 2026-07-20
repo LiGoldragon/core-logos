@@ -103,7 +103,11 @@ struct Lexicon {
 impl Lexicon {
     fn build() -> Self {
         let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
-        let mut keyword = |text: &str| names.intern(Name::new(text));
+        let mut keyword = |text: &str| {
+            names
+                .intern(Name::new(text))
+                .expect("allocate fixed Logos grammar keyword")
+        };
         let newtype = keyword("Newtype");
         let tool_path = keyword("ToolPath");
         let configuration = keyword("Configuration");
@@ -615,7 +619,9 @@ impl TextualLogos {
 
     fn keyword(&self, names: &mut NameTable, text: &str) -> Identifier {
         let _ = &self.lexicon;
-        names.intern(Name::new(text))
+        names
+            .intern(Name::new(text))
+            .expect("allocate fixed Logos text keyword")
     }
 
     fn chosen<'value>(

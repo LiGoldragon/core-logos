@@ -5,7 +5,7 @@
 //! the canonical slice that resolves them at the NameTable/emission boundary. No
 //! schema-derived name belongs here.
 
-use name_table::{Identifier, IdentifierNamespace, Name, NameTable};
+use name_table::{Identifier, IdentifierNamespace, Name, NameTable, NameTableError};
 
 macro_rules! logos_standard_vocabulary {
     ($(($variant:ident, $constant:ident, $spelling:literal)),+ $(,)?) => {
@@ -81,11 +81,11 @@ logos_standard_vocabulary!(
 /// The generated constants and this slice derive from the same closed vocabulary.
 /// Callers compose this completed slice into their Logos NameTable; they never
 /// allocate one of these names into the Logos-owned append slice.
-pub fn standard_name_table() -> NameTable {
+pub fn standard_name_table() -> Result<NameTable, NameTableError> {
     let mut names = NameTable::new(IdentifierNamespace::LogosStandard);
     for standard in StandardIdentifier::ALL {
-        let allocated = names.intern(Name::new(standard.spelling()));
+        let allocated = names.intern(Name::new(standard.spelling()))?;
         debug_assert_eq!(allocated, standard.identifier());
     }
-    names
+    Ok(names)
 }
