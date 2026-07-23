@@ -1,19 +1,19 @@
 //! # core-logos
 //!
-//! The stringless Core algebra of Logos — the Rust-equivalent data language,
-//! 1-to-1 with Rust at the Core. This crate is **text-free**: it depends on no
+//! The stringless encoded-form algebra of Logos — the Rust-equivalent data language,
+//! 1-to-1 with Rust. This crate is **text-free**: it depends on no
 //! `syn`, `prettyplease`, `quote`, or proc-macro machinery. Every identifier is an
 //! [`name_table::Identifier`] into a NameTable; paths are segment vectors of
 //! identifiers. The `::`, the `<>`, the `pub` keyword, and snake_case field names
 //! are all projection concerns that materialize far from this crate, in the later
 //! `TextualRust` sibling codec.
 //!
-//! The centerpiece is [`CoreItem`], a closed enum over a shared stringless leaf
-//! vocabulary. Content identity ([`CoreItem::content_identity`]) is computed over a
-//! value's portable-archive bytes under [`CoreLogosDomain`], with the NameTable
+//! The centerpiece is [`EncodedItem`], a closed enum over a shared stringless leaf
+//! vocabulary. Content identity ([`EncodedItem::content_identity`]) is computed over a
+//! value's portable-archive bytes under [`EncodedLogosDomain`], with the NameTable
 //! excluded — so a rename is hash-stable and a structural edit moves the identity.
-//! The NameTable is one continuous identifier space extending the schema NameTable
-//! (via [`name_table::NameTable::extend_from`]).
+//! A Logos NameTable owns its Logos namespace and composes completed schema slices
+//! without copying, flattening, or renumbering their identifiers.
 
 pub mod alias;
 pub mod attribute;
@@ -41,7 +41,7 @@ pub use attribute::{
     Attribute, ConfigurationAttribute, ConfigurationPredicate, DeriveGroup, HelperDerive,
 };
 pub use const_item::Const;
-pub use domain::CoreLogosDomain;
+pub use domain::EncodedLogosDomain;
 pub use enumeration::{Enumeration, Variant, VariantPayload};
 pub use error::Error;
 pub use expression::{
@@ -54,7 +54,7 @@ pub use field::Field;
 pub use function::{Block, Function, LetBinding, LetStatement, Parameter, Receiver, Statement};
 pub use generics::{GenericParameter, Generics, LifetimeParameter, TypeParameter};
 pub use impl_block::{AssociatedType, ImplBlock, ImplItem};
-pub use item::CoreItem;
+pub use item::EncodedItem;
 pub use module::Module;
 pub use newtype::Newtype;
 pub use path::PathNode;

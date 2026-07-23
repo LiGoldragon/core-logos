@@ -1,5 +1,5 @@
 {
-  description = "core-logos — the stringless Core algebra of Logos, the Rust-equivalent data language (text-free Core)";
+  description = "core-logos — the stringless encoded-form algebra of Logos, the Rust-equivalent data language (text-free encoded form)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";

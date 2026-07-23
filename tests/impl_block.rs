@@ -1,18 +1,18 @@
 //! The impl-block and function item kinds archive and content-address like every
-//! other Core item: a portable-archive round-trip is identity, and a structural edit
-//! to a body expression moves the content identity.
+//! other encoded item: a portable-archive round-trip is identity, and a structural
+//! edit to a body expression moves the content identity.
 
 mod support;
 
 use content_identity::PortableArchive;
 use core_logos::{
-    Block, Call, Callee, CoreItem, Expression, Function, ImplBlock, ImplItem, MethodCall,
+    Block, Call, Callee, EncodedItem, Expression, Function, ImplBlock, ImplItem, MethodCall,
     Parameter, ReferenceExpression, ReferenceMutability, TupleFieldAccess, TypeReference,
     Visibility,
 };
 use name_table::NameTable;
 
-/// Build the `Topic` inherent impl block as a stringless Core value:
+/// Build the `Topic` inherent impl block as a stringless encoded value:
 ///
 /// ```ignore
 /// impl Topic {
@@ -21,7 +21,7 @@ use name_table::NameTable;
 ///     pub fn into_payload(self) -> String { self.0 }
 /// }
 /// ```
-fn topic_impl(names: &mut NameTable) -> CoreItem {
+fn topic_impl(names: &mut NameTable) -> EncodedItem {
     let payload = support::identifier(names, "payload");
     let self_path = support::path(names, &["Self"]);
     let into = support::identifier(names, "into");
@@ -102,7 +102,7 @@ fn topic_impl(names: &mut NameTable) -> CoreItem {
         },
     };
 
-    CoreItem::ImplBlock(ImplBlock {
+    EncodedItem::ImplBlock(ImplBlock {
         attributes: vec![core_logos::Attribute::ToolPath(support::path(
             names,
             &["rustfmt", "skip"],
@@ -120,18 +120,18 @@ fn topic_impl(names: &mut NameTable) -> CoreItem {
 
 #[test]
 fn an_impl_block_round_trips_through_portable_archive() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = topic_impl(&mut names);
 
     let bytes = item.to_archive_bytes().expect("serialize");
-    let restored = CoreItem::from_archive_bytes(&bytes).expect("deserialize");
+    let restored = EncodedItem::from_archive_bytes(&bytes).expect("deserialize");
 
     assert_eq!(item, restored);
 }
 
 #[test]
 fn an_impl_block_has_no_declared_name_but_carries_its_attributes() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = topic_impl(&mut names);
 
     assert_eq!(item.name(), None, "an impl block declares no name");
@@ -140,12 +140,12 @@ fn an_impl_block_has_no_declared_name_but_carries_its_attributes() {
 
 #[test]
 fn editing_a_body_expression_moves_the_impl_block_identity() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = topic_impl(&mut names);
     let before = item.content_identity().expect("hash");
 
     // Change `into_payload`'s body from `self.0` to `self.1` — a structural edit.
-    let CoreItem::ImplBlock(mut impl_block) = item else {
+    let EncodedItem::ImplBlock(mut impl_block) = item else {
         panic!("impl block");
     };
     let ImplItem::Method(into_payload) = &mut impl_block.items[2] else {
@@ -155,7 +155,7 @@ fn editing_a_body_expression_moves_the_impl_block_identity() {
         base: Box::new(Expression::Receiver),
         index: 1,
     });
-    let after = CoreItem::ImplBlock(impl_block)
+    let after = EncodedItem::ImplBlock(impl_block)
         .content_identity()
         .expect("hash");
 
@@ -166,10 +166,10 @@ fn editing_a_body_expression_moves_the_impl_block_identity() {
     );
 }
 
-/// A free function is a `CoreItem::Function`, not only an impl member.
+/// A free function is a `EncodedItem::Function`, not only an impl member.
 #[test]
 fn a_free_function_is_a_named_content_addressable_item() {
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let value = support::identifier(&mut names, "value");
     let name = support::identifier(&mut names, "identity");
     let string = support::path(&mut names, &["String"]);
@@ -192,10 +192,10 @@ fn a_free_function_is_a_named_content_addressable_item() {
             }),
         },
     };
-    let item = CoreItem::Function(function);
+    let item = EncodedItem::Function(function);
 
     assert!(item.name().is_some(), "a function has a declared name");
     let bytes = item.to_archive_bytes().expect("serialize");
-    let restored = CoreItem::from_archive_bytes(&bytes).expect("deserialize");
+    let restored = EncodedItem::from_archive_bytes(&bytes).expect("deserialize");
     assert_eq!(item, restored);
 }

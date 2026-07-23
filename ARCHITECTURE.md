@@ -1,14 +1,16 @@
 # core-logos architecture
 
 `core-logos` is slice three of the psyche-authorized language-family proof of
-concept: the stringless Core algebra of Logos, the Rust-equivalent data language.
+concept: the stringless encoded-form algebra of Logos, the Rust-equivalent data
+language.
 This document records the durable direction — the rulings the crate embodies and
 the boundaries it holds — for an agent entering the repository.
 
-## The one ruling that shapes everything: 1-to-1 with Rust, at the Core
+## The one ruling that shapes everything: 1-to-1 with Rust in encoded form
 
-Logos is 1-to-1 with Rust at the Core. Every token of Rust meaning is stored data
-in a CoreLogos value; nothing is materialized at projection. Concretely:
+Logos is 1-to-1 with Rust in its encoded form. Every token of Rust meaning is
+stored data in an `EncodedLogos` value; nothing is materialized at projection.
+Concretely:
 
 - The field **name is always present** as a stored `Identifier`. Text elision (a
   field name dropped when it equals the snake_case of its type) is a text
@@ -26,12 +28,12 @@ in a CoreLogos value; nothing is materialized at projection. Concretely:
 ## The text-free boundary
 
 This crate depends on no `syn`, `prettyplease`, `quote`, or proc-macro machinery.
-Core never depends on text. The TextualRust codec — `syn` decode and
+The encoded form never depends on text. The TextualRust codec — `syn` decode and
 `prettyplease` encode against the schema-rust goldens — is a **later sibling
-crate**. It reads and writes CoreLogos; it does not live here. Keeping the Core
-text-free is what lets the same Core be viewed through many textual forms
-(TextualLogos, TextualRust, and future emission languages) without any of them
-reaching into the Core.
+crate**. It reads and writes `EncodedLogos`; it does not live here. Keeping the
+encoded form text-free is what lets the same encoded value be viewed through many
+textual forms (TextualLogos, TextualRust, and future emission languages) without
+any of them reaching into the encoded form.
 
 Stringlessness is total: every identifier is a `name_table::Identifier`; paths are
 segment vectors of identifiers (dotted in any text form; `::` materializes only at
@@ -42,26 +44,25 @@ the TextualRust sibling, not here.
 
 ## Content identity
 
-`CoreItem::content_identity` is `ContentHash::of_core` under `CoreLogosDomain`, a
-`Contextual` hash domain tagged with `LayoutVersion(4)` (see "Content identity and
-layout version" below for why layout 4). The pre-image is the value's canonical
-portable-archive bytes; the NameTable is excluded (it is not part of a Core value).
-Two invariants follow and are tested:
+`EncodedItem::content_identity` is `ContentHash::of_core` under
+`EncodedLogosDomain`, a `Contextual` hash domain tagged with `LayoutVersion(7)`.
+The pre-image is the value's canonical portable-archive bytes; the NameTable is
+excluded (it is not part of an encoded value). Two invariants follow and are
+tested:
 
-- **Rename is hash-stable.** The Core carries the identifier, never the string, so
-  changing what a name projects to does not move the identity.
+- **Rename is hash-stable.** The encoded value carries the identifier, never the
+  string, so changing what a name projects to does not move the identity.
 - **A structural edit moves the identity.** Changing a wrapped type, a visibility,
-  or attribute order changes the Core value and therefore its hash.
+  or attribute order changes the encoded value and therefore its hash.
 
-## One continuous identifier space
+## Composed identifier namespaces
 
-The logos NameTable extends the schema NameTable via `name_table::extend_from`: the
-logos table is a higher-index append-extension of the schema table, so a
-carried-over schema identifier keeps its exact index. The continuity test builds a
-core-schema-populated table and proves existing indices stay stable while new
-logos names append above the base.
+A Logos NameTable owns the `Logos` namespace and composes completed schema slices.
+Borrowed `Schema` identifiers retain their exact namespace and local allocation;
+they are neither copied, flattened, nor renumbered. New Logos names allocate only
+in the Logos home slice. The composition test proves both properties.
 
-## Scope: which item kinds this Core carries, and why
+## Scope: which item kinds this encoded form carries, and why
 
 The accepted Rust-lowering ontology (`reports/logos/logos-rust-lowering-v1.md`)
 names seven item kinds: `Newtype`, `Struct`, `Enumeration`, `Alias`,
@@ -80,14 +81,14 @@ an `AssociatedType` (`type Err = NotaDecodeError;`), or an `AssociatedConst`
 binding that precedes its method round-trips in place. `Const` is one node shared by
 a top-level const, a module const, and an associated const, because they are one
 concept; its visibility is stored data (a trait-impl associated const stores
-`Private`). `Module` carries a `Vec<CoreItem>`; the witnessed shape is the
+`Private`). `Module` carries a `Vec<EncodedItem>`; the witnessed shape is the
 `short_header` const module.
 
 `Use` is a `<attrs> <vis> use <base>::{<group>};` node: a base path and an ordered
 group of imported leaf identifiers, stored as data. It carries the fixed cfg-gated
 NOTA import (`#[cfg(feature = "nota-text")] pub use nota::{NotaDecodeError,
 NotaEncode, NotaSource};`) that heads the generated wire modules. Like an impl block
-it declares no name (`CoreItem::name` returns `None`); unlike one it carries its own
+it declares no name (`EncodedItem::name` returns `None`); unlike one it carries its own
 visibility, so `with_visibility` stamps it. The plain `#[cfg(...)]` gate is a new
 `Attribute::Cfg(ConfigurationPredicate)` variant, reusing the one predicate
 vocabulary shared with `cfg_attr` (distinct from `Configuration`, which gates an
@@ -133,9 +134,9 @@ struct-variant literal), so they are not needed and a body demanding them is sti
 rejected loudly by the TextualRust reader. Const generic parameters remain excluded
 (unwitnessed).
 
-Totality is structural: `CoreItem`'s methods match every variant with no wildcard
+Totality is structural: `EncodedItem`'s methods match every variant with no wildcard
 arm, so a new item kind is a compile error until its handling is written. An impl
-block declares no name, so `CoreItem::name` returns `Option<Identifier>` — the "does
+block declares no name, so `EncodedItem::name` returns `Option<Identifier>` — the "does
 this item have a name?" question dissolves into a normal `None` rather than a
 fabricated identifier, and an impl block has no visibility, so `with_visibility`
 returns it unchanged.
@@ -151,7 +152,7 @@ Every choice below the psyche rulings is a revisable lean with a stated trigger:
 - **String-literal content is stored data, not an interned name.** A name is
   interned and excluded from content identity (rename-stable); a string literal's
   content is semantic and is hashed as part of the value, so `Expression::StringLiteral`
-  carries a `String`. This is the one place a Core value holds owned text, and it is
+  carries a `String`. This is the one place an encoded value holds owned text, and it is
   literal-value data, not the raw-token-text escape hatch the text-free boundary
   forbids. *Trigger:* if a projection ever needs to intern literal content, revisit.
 - **Reference mutability is modeled; `&mut self` is not.** The layout-3 growth added
@@ -163,7 +164,7 @@ Every choice below the psyche rulings is a revisable lean with a stated trigger:
 - **Integer literals are value-plus-representation, never stored text.** An
   `IntegerLiteral` carries a `u128` value and a closed `IntegerRepresentation`
   (`Decimal`, or `Hexadecimal { minimum_digits }` for the zero-padded `0x…` form),
-  so `0x0001000000000000` round-trips byte-exact without the Core holding raw token
+  so `0x0001000000000000` round-trips byte-exact without the encoded form holding raw token
   text — the stringless boundary holds and the string-literal exception below stays
   the *only* owned-text field. The hexadecimal form is **lowercase** (the goldens'
   digits are `0`/`1`, case-agnostic). *Trigger:* a witnessed literal needs uppercase
@@ -195,25 +196,25 @@ Every choice below the psyche rulings is a revisable lean with a stated trigger:
 
 ## Content identity and layout version across this growth
 
-**The layout is 2, and the correction below records why.** An earlier version of
-this document claimed that adding item kinds was "append-only" enum growth under
-which "every pre-existing Core value archives to byte-identical bytes and its
-content identity does not move," and concluded that `LayoutVersion(1)` should be
-kept. **That reasoning was wrong, and the claim was false.** The commit messages
+**The current layout is 7.** The historical record below begins with the
+layout-2 correction. An earlier version of this document claimed that adding item
+kinds was "append-only" enum growth under which "every pre-existing encoded value
+archives to byte-identical bytes and its content identity does not move," and
+concluded that `LayoutVersion(1)` should be kept. **That reasoning was wrong, and the claim was false.** The commit messages
 that shipped the growth are history and stand; this document must tell the truth,
 so it records the correction here.
 
 The error was reasoning about append-only-ness at the **Rust source level** and
 assuming it carried to the **archived byte level**. It does not, because of how
 rkyv lays out enums. rkyv archives an enum at a **fixed size equal to its largest
-variant** — every `ArchivedCoreItem`, regardless of which variant it holds,
+variant** — every `ArchivedEncodedItem`, regardless of which variant it holds,
 occupies the same footprint. Content identity is blake3 over the **full archived
 root**, so that footprint is in the pre-image of every value.
 
 Concretely, on the empirical record:
 
 - Commit `be809429` added the `Function` variant, whose archived form grew
-  `ArchivedCoreItem`'s max size from **47 to 101 bytes**. Every `CoreItem` value —
+  `ArchivedEncodedItem`'s max size from **47 to 101 bytes**. Every `EncodedItem` value —
   including shapes untouched at the Rust source level — therefore re-serialized
   larger and its content hash **moved**: a same-shape `Newtype` went from 51 to 105
   archived bytes and its hash moved from `2c26397e…` to `1c8ae182…`. Yet
@@ -222,8 +223,8 @@ Concretely, on the empirical record:
 - Commit `f7dd7d6b` inserted `Attribute::Cfg` at discriminant index 2, **shifting**
   the `ToolPath` and `HelperDerive` tags. That is a discriminant reordering, not
   append-only growth — it moves the archived tag byte of every attribute at or after
-  that index. It happened to be **benign for `CoreItem`'s hash only because the
-  attribute enum's max variant size did not change**, so `ArchivedCoreItem`'s
+  that index. It happened to be **benign for `EncodedItem`'s hash only because the
+  attribute enum's max variant size did not change**, so `ArchivedEncodedItem`'s
   footprint was unaffected. Benign-by-luck is still a layout-relevant change of
   exactly the mis-grounded kind: the safe discipline is to treat any discriminant
   reordering as hash-affecting unless proven otherwise.
@@ -246,9 +247,9 @@ deliberate constant update rather than a silent hash move.
 
 **Consumers cross a hash boundary at layout 2.** Any consumer advancing its
 `core-logos` pin across `be809429` and later moves from layout-1 hashes to
-layout-2 hashes: every CoreLogos content identity it computes changes. A host
+layout-2 hashes: every EncodedLogos content identity it computes changes. A host
 survey at the time of this correction confirmed **no durable store or fixture holds
-persisted CoreLogos hashes** (everything recomputes, or is tempdir-ephemeral), so
+persisted EncodedLogos hashes** (everything recomputes, or is tempdir-ephemeral), so
 this correction needs no data migration — but the boundary is real, and a consumer
 must advance across it only via the deliberate cascade slice, never casually.
 
@@ -259,8 +260,8 @@ cover the goldens' interface-enum ergonomics (constructor and `From` impls, the
 cfg-gated `FromStr`/`Display` impls with their associated types and mutable-formatter
 signatures), the trace/object-name enums with nested-match `name` methods, and the
 class-C stub items (const, const module, associated const). That growth moved the
-archived representation in three compounding ways — `CoreItem` gained `Const` and
-`Module` (the latter carrying `Vec<CoreItem>`); `ImplBlock` replaced its
+archived representation in three compounding ways — `EncodedItem` gained `Const` and
+`Module` (the latter carrying `Vec<EncodedItem>`); `ImplBlock` replaced its
 `Vec<Function>` with a `Vec<ImplItem>`; and `Expression`, `TypeReference`,
 `ReferenceType`, and `MethodCall` grew tail variants and fields. All enum growth is
 **append-only at the tail** (no discriminant shifted), but by the truthful rule that
@@ -292,12 +293,29 @@ projects to the empty token stream, so a bare newtype (`CommitSequence(Integer)`
 stores `Private` and projects unchanged — the "no `pub` on the field" special case
 dissolves into the normal case. rkyv archives a struct as the concatenation of its
 fields, so the new field enlarged every `Newtype` value's archived bytes and, because
-`CoreItem` is a fixed-size enum sized to its largest variant, moved every
-`CoreItem` value's archived bytes. `LayoutVersion(3)` hashed the class-B/C/D shape;
+`EncodedItem` is a fixed-size enum sized to its largest variant, moved every
+`EncodedItem` value's archived bytes. `LayoutVersion(3)` hashed the class-B/C/D shape;
 **`LayoutVersion(4)` hashes the tuple-field-visibility shape**, and
 `tests/content_hash_witness.rs` pins the new absolute hash deliberately. Consumers
 (the signal-sema-storage seam) cross this hash boundary and must re-converge across
 layout 4 only via the deliberate cascade slice, never casually.
+
+### Layout 5 and layout 6: ordinary-exchange vocabulary
+
+Layout 5 added the ordinary-exchange codec-body vocabulary: `Block` gained ordered
+statements, `Call` gained type arguments, and the `Expression`, `TypeReference`,
+and `Pattern` algebras gained their witnessed variants. Layout 6 then added the
+ordinary-exchange envelope vocabulary, including `StructLiteral`. Each change
+moved archived bytes and received its own deliberate layout bump.
+
+### Layout 7: namespace-variant identifiers
+
+Layout 7 adopts namespace-variant `Identifier` values with `u16` locals and the
+canonical `EncodedLogos` hash context. Every `EncodedItem` stores identifiers, so
+replacing the former flat representation changes its archived bytes even when the
+Rust-shaped data is otherwise identical; the renamed context deliberately changes
+the domain preamble as well. The `CommitSequence` absolute witness at layout 7 is
+`3f2d85f564a74df7962f4e9a110fdab92b1dc1899edd8f418314e254f285e73d`.
 
 ## Release-train status
 

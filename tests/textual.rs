@@ -1,17 +1,17 @@
-//! The Logos text mouth (epic primary-56d1.43): CoreLogos values encode to and decode
+//! The Logos text mouth (epic primary-56d1.43): EncodedLogos values encode to and decode
 //! from positional NOTA-family (Protos) text through the ONE trusted structural-codec
 //! evaluator walking a sealed structuretree plus the nametree — the strict invariant.
 //! There is no bespoke per-type parse or print path here: every spelling is a
 //! `StructuralForm` in the sealed table, and `TextualLogos` implements the shared
 //! `TextualForm` operation, supplying only `reify` / `reflect` between the generic
-//! mirror and CoreLogos.
+//! mirror and EncodedLogos.
 //!
 //! The spellings are DERIVED from the delivered data shapes through the ruled Protos
 //! laws (protos-syntax): an enum variant carrying a payload is `Head.payload` (the
 //! `Tick.7` law); a struct is a `{ … }` positional record; a `Vec` is a `[ … ]`
 //! vector; a path is a glued-dot right-associative application (`rkyv.Archive`); a
 //! unit enum variant is a bare PascalCase atom; a canonical string is a bare atom.
-//! CoreLogos struct fields are structural, not name-data, so the record is purely
+//! EncodedLogos struct fields are structural, not name-data, so the record is purely
 //! positional — no field names are written (and none are elided).
 //!
 //! Witness: the REAL golden `CommitSequence` newtype value — all five fields, the full
@@ -26,16 +26,14 @@
 mod support;
 
 use core_logos::{
-    Attribute, ConfigurationAttribute, ConfigurationPredicate, CoreItem, DeriveGroup, Newtype,
+    Attribute, ConfigurationAttribute, ConfigurationPredicate, DeriveGroup, EncodedItem, Newtype,
     PathNode, TypeReference, Visibility,
 };
 use name_table::{Identifier, Name, NameResolver, NameTable, NameTableError};
 use raw_discovery::{Delimiter, RecognizeError};
-use structural_codec::ids::{
-    CoreConstructorId, PositionalSignature, ScopedCoreTypeId, StructuralRevision,
-};
+use structural_codec::ids::{EncodedConstructorId, PositionalSignature, ScopedEncodedTypeId};
 use structural_codec::table::{
-    AddressedStructuralTable, CoreLayoutIdentity, RawProfileIdentity, TableIdentityPayload,
+    AddressedStructuralTable, EncodedLayoutIdentity, RawProfileIdentity, TableIdentityPayload,
 };
 use structural_codec::value::StructuralValue;
 use structural_codec::{
@@ -49,12 +47,12 @@ use structural_codec::{
 struct LogosLanguage;
 
 // The logos textual universe's type ids (locals in the fixture universe namespace).
-const ITEM: ScopedCoreTypeId = ScopedCoreTypeId::fixture(1);
-const VISIBILITY: ScopedCoreTypeId = ScopedCoreTypeId::fixture(2);
-const ATTRIBUTE: ScopedCoreTypeId = ScopedCoreTypeId::fixture(3);
-const CONFIG_PREDICATE: ScopedCoreTypeId = ScopedCoreTypeId::fixture(4);
-const PATH_NODE: ScopedCoreTypeId = ScopedCoreTypeId::fixture(5);
-const TYPE_REFERENCE: ScopedCoreTypeId = ScopedCoreTypeId::fixture(6);
+const ITEM: ScopedEncodedTypeId = ScopedEncodedTypeId::fixture(1);
+const VISIBILITY: ScopedEncodedTypeId = ScopedEncodedTypeId::fixture(2);
+const ATTRIBUTE: ScopedEncodedTypeId = ScopedEncodedTypeId::fixture(3);
+const CONFIG_PREDICATE: ScopedEncodedTypeId = ScopedEncodedTypeId::fixture(4);
+const PATH_NODE: ScopedEncodedTypeId = ScopedEncodedTypeId::fixture(5);
+const TYPE_REFERENCE: ScopedEncodedTypeId = ScopedEncodedTypeId::fixture(6);
 
 // The constructor indices inside each type's entry — the disjoint decode alternatives.
 const VISIBILITY_PUBLIC: u32 = 0;
@@ -65,7 +63,7 @@ const ATTRIBUTE_DERIVE: u32 = 2;
 const PATH_SINGLE: u32 = 0;
 const PATH_MULTI: u32 = 1;
 
-/// A Textual round-trip over CoreLogos failed.
+/// A Textual round-trip over EncodedLogos failed.
 #[derive(Debug, thiserror::Error)]
 enum LogosTextError {
     #[error(transparent)]
@@ -100,8 +98,12 @@ struct Lexicon {
 
 impl Lexicon {
     fn build() -> Self {
-        let mut names = NameTable::new();
-        let mut keyword = |text: &str| names.intern(Name::new(text));
+        let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
+        let mut keyword = |text: &str| {
+            names
+                .intern(Name::new(text))
+                .expect("allocate textual keyword")
+        };
         let newtype = keyword("Newtype");
         let tool_path = keyword("ToolPath");
         let configuration = keyword("Configuration");
@@ -122,7 +124,7 @@ impl Lexicon {
     }
 }
 
-/// One textual mouth of CoreLogos: the sealed structuretree plus the keyword lexicon.
+/// One textual mouth of EncodedLogos: the sealed structuretree plus the keyword lexicon.
 struct TextualLogos {
     table: AddressedStructuralTable,
     lexicon: Lexicon,
@@ -143,17 +145,15 @@ impl TextualLogos {
         ];
         let payload = TableIdentityPayload {
             core_universe: structural_codec::ids::FIXTURE_UNIVERSE,
-            core_layout_identity: CoreLayoutIdentity([7u8; 32]),
+            core_layout_identity: EncodedLayoutIdentity([7u8; 32]),
             raw_profile_identity: RawProfileIdentity([1u8; 32]),
-            committed_lexicon: b"core-logos-textual".to_vec(),
             leaf_codec_contracts: Vec::new(),
             entries: entries
                 .into_iter()
                 .map(|entry| (entry.core_type, entry))
                 .collect(),
         };
-        let table = AddressedStructuralTable::seal(StructuralRevision::new(1), payload)
-            .expect("seal the logos structuretree");
+        let table = AddressedStructuralTable::seal(payload).expect("seal the logos structuretree");
         table
             .validate_disjoint()
             .expect("every decode alternative is provably disjoint");
@@ -163,11 +163,11 @@ impl TextualLogos {
     // ===== structuretree authoring =====
 
     /// A single-constructor entry.
-    fn solo(core_type: ScopedCoreTypeId, form: StructuralForm) -> StructuralEntry {
+    fn solo(core_type: ScopedEncodedTypeId, form: StructuralForm) -> StructuralEntry {
         StructuralEntry::new(
             core_type,
             vec![ConstructorCodec::new(
-                CoreConstructorId::new(core_type, 0),
+                EncodedConstructorId::new(core_type, 0),
                 vec![form.clone()],
                 form,
                 PositionalSignature::default(),
@@ -175,9 +175,9 @@ impl TextualLogos {
         )
     }
 
-    fn codec(core_type: ScopedCoreTypeId, index: u32, form: StructuralForm) -> ConstructorCodec {
+    fn codec(core_type: ScopedEncodedTypeId, index: u32, form: StructuralForm) -> ConstructorCodec {
         ConstructorCodec::new(
-            CoreConstructorId::new(core_type, index),
+            EncodedConstructorId::new(core_type, index),
             vec![form.clone()],
             form,
             PositionalSignature::default(),
@@ -198,17 +198,17 @@ impl TextualLogos {
     }
 
     /// `Newtype.{ <visibility> [<attrs>] <name> <wrapped_visibility> <wrapped> }` — the
-    /// CoreItem::Newtype spelling: the enum-variant keyword head over the newtype's
+    /// EncodedItem::Newtype spelling: the enum-variant keyword head over the newtype's
     /// five positional fields in declaration order.
     fn item_entry(lexicon: &Lexicon) -> StructuralEntry {
         let body = StructuralForm::Delimited {
             delimiter: Delimiter::Brace,
             sequence: SequenceForm::Product(vec![
-                StructuralForm::Delegate(VISIBILITY),
-                Self::vector(StructuralForm::Delegate(ATTRIBUTE)),
+                StructuralForm::delegate(VISIBILITY),
+                Self::vector(StructuralForm::delegate(ATTRIBUTE)),
                 StructuralForm::pascal_atom(),
-                StructuralForm::Delegate(VISIBILITY),
-                StructuralForm::Delegate(TYPE_REFERENCE),
+                StructuralForm::delegate(VISIBILITY),
+                StructuralForm::delegate(TYPE_REFERENCE),
             ]),
         };
         Self::solo(ITEM, Self::keyword_application(lexicon.newtype, body))
@@ -239,20 +239,20 @@ impl TextualLogos {
     /// `Derive.[ <paths> ]`.
     fn attribute_entry(lexicon: &Lexicon) -> StructuralEntry {
         let tool_path =
-            Self::keyword_application(lexicon.tool_path, StructuralForm::Delegate(PATH_NODE));
+            Self::keyword_application(lexicon.tool_path, StructuralForm::delegate(PATH_NODE));
         let configuration = Self::keyword_application(
             lexicon.configuration,
             StructuralForm::Delimited {
                 delimiter: Delimiter::Brace,
                 sequence: SequenceForm::Product(vec![
-                    StructuralForm::Delegate(CONFIG_PREDICATE),
-                    StructuralForm::Delegate(ATTRIBUTE),
+                    StructuralForm::delegate(CONFIG_PREDICATE),
+                    StructuralForm::delegate(ATTRIBUTE),
                 ]),
             },
         );
         let derive = Self::keyword_application(
             lexicon.derive,
-            Self::vector(StructuralForm::Delegate(PATH_NODE)),
+            Self::vector(StructuralForm::delegate(PATH_NODE)),
         );
         StructuralEntry::new(
             ATTRIBUTE,
@@ -266,13 +266,8 @@ impl TextualLogos {
 
     /// `Feature.<name>` — the one predicate the golden uses.
     fn config_predicate_entry(lexicon: &Lexicon) -> StructuralEntry {
-        let form = Self::keyword_application(
-            lexicon.feature,
-            StructuralForm::Atom(AtomForm {
-                case: None,
-                sigil: None,
-            }),
-        );
+        let form =
+            Self::keyword_application(lexicon.feature, StructuralForm::Atom(AtomForm::any_case()));
         Self::solo(CONFIG_PREDICATE, form)
     }
 
@@ -280,16 +275,10 @@ impl TextualLogos {
     /// forms are disjoint (an atom is not an application). `head.rest` consumes the
     /// head atom before delegating, so the recursion is guarded.
     fn path_node_entry() -> StructuralEntry {
-        let single = StructuralForm::Atom(AtomForm {
-            case: None,
-            sigil: None,
-        });
+        let single = StructuralForm::Atom(AtomForm::any_case());
         let multi = StructuralForm::application(
-            StructuralForm::Atom(AtomForm {
-                case: None,
-                sigil: None,
-            }),
-            StructuralForm::Delegate(PATH_NODE),
+            StructuralForm::Atom(AtomForm::any_case()),
+            StructuralForm::delegate(PATH_NODE),
         );
         StructuralEntry::new(
             PATH_NODE,
@@ -303,16 +292,16 @@ impl TextualLogos {
     /// The golden's wrapped type is a bare path (`Integer`); `TypeReference::Path`
     /// delegates to the path node. (Other TypeReference kinds are deferred.)
     fn type_reference_entry() -> StructuralEntry {
-        Self::solo(TYPE_REFERENCE, StructuralForm::Delegate(PATH_NODE))
+        Self::solo(TYPE_REFERENCE, StructuralForm::delegate(PATH_NODE))
     }
 
-    // ===== reify: StructuralValue mirror -> CoreLogos =====
+    // ===== reify: StructuralValue mirror -> EncodedLogos =====
 
     fn reify_item(
         &self,
         mirror: &StructuralValue,
         names: &mut NameTable,
-    ) -> Result<CoreItem, LogosTextError> {
+    ) -> Result<EncodedItem, LogosTextError> {
         let (constructor, payload) = Self::chosen(mirror, "item")?;
         // Only the Newtype constructor is authored for the golden witness.
         if constructor != 0 {
@@ -321,7 +310,7 @@ impl TextualLogos {
         let body = Self::application_body(payload, "newtype application")?;
         let [visibility, attributes, name, wrapped_visibility, wrapped] =
             Self::delimited(body, "newtype fields")?;
-        Ok(CoreItem::Newtype(Newtype {
+        Ok(EncodedItem::Newtype(Newtype {
             visibility: Self::reify_visibility(visibility)?,
             attributes: self.reify_attributes(attributes, names)?,
             name: Self::atom(name, "newtype name")?,
@@ -437,14 +426,14 @@ impl TextualLogos {
         }
     }
 
-    // ===== reflect: CoreLogos -> StructuralValue mirror =====
+    // ===== reflect: EncodedLogos -> StructuralValue mirror =====
 
     fn reflect_item(
         &self,
-        item: &CoreItem,
+        item: &EncodedItem,
         names: &mut NameTable,
     ) -> Result<StructuralValue, LogosTextError> {
-        let CoreItem::Newtype(newtype) = item else {
+        let EncodedItem::Newtype(newtype) = item else {
             return Err(LogosTextError::ReifyShape(
                 "only Newtype items are authored",
             ));
@@ -589,7 +578,9 @@ impl TextualLogos {
                     )))),
                 ),
             ),
-            None => StructuralValue::chosen(PATH_SINGLE, StructuralValue::Atom(Identifier::new(0))),
+            None => {
+                StructuralValue::chosen(PATH_SINGLE, StructuralValue::Atom(Identifier::Logos(0)))
+            }
         }
     }
 
@@ -611,7 +602,9 @@ impl TextualLogos {
 
     fn keyword(&self, names: &mut NameTable, text: &str) -> Identifier {
         let _ = &self.lexicon;
-        names.intern(Name::new(text))
+        names
+            .intern(Name::new(text))
+            .expect("allocate textual keyword")
     }
 
     fn chosen<'value>(
@@ -677,7 +670,7 @@ impl TextualLogos {
 }
 
 impl Textual for TextualLogos {
-    type Encoded = CoreItem;
+    type Encoded = EncodedItem;
     type Language = LogosLanguage;
     type Error = LogosTextError;
 
@@ -695,17 +688,17 @@ impl Textual for TextualLogos {
 
     fn reify(
         &self,
-        _expected: ScopedCoreTypeId,
+        _expected: ScopedEncodedTypeId,
         mirror: &StructuralValue,
         names: &mut NameTable,
-    ) -> Result<CoreItem, LogosTextError> {
+    ) -> Result<EncodedItem, LogosTextError> {
         self.reify_item(mirror, names)
     }
 
     fn reflect(
         &self,
-        _expected: ScopedCoreTypeId,
-        encoded: &CoreItem,
+        _expected: ScopedEncodedTypeId,
+        encoded: &EncodedItem,
         names: &mut NameTable,
     ) -> Result<StructuralValue, LogosTextError> {
         self.reflect_item(encoded, names)
@@ -718,7 +711,7 @@ impl Textual for TextualLogos {
 #[test]
 fn golden_commit_sequence_round_trips_through_the_organs() {
     let mouth = TextualLogos::build();
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let golden = support::commit_sequence(&mut names);
 
     // view: the EncodedForm value -> canonical Protos text through the organs. Text

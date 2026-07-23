@@ -1,16 +1,16 @@
 //! Cross-version golden-hash witness: an ABSOLUTE content-hash constant for a
-//! representative CoreLogos value under the current layout version.
+//! representative EncodedLogos value under the current layout version.
 //!
 //! This is the witness whose absence let a false stability claim ship. When
 //! `core-logos` commit be809429 added the `Function` item kind, rkyv's fixed-size
-//! enum layout grew `ArchivedCoreItem` from 47 to 101 bytes, so every value's
+//! enum layout grew `ArchivedEncodedItem` from 47 to 101 bytes, so every value's
 //! archived bytes — and therefore its blake3 content identity — moved, while the
 //! layout version and the ARCHITECTURE claimed the identity was stable. A pinned
 //! absolute hash makes that class of change impossible to ship silently: it fails
 //! this test loudly.
 //!
-//! If this test fails, the archived representation of a CoreLogos value changed.
-//! That is a layout event, never a casual edit: bump `CoreLogosDomain`'s
+//! If this test fails, the archived representation of a EncodedLogos value changed.
+//! That is a layout event, never a casual edit: bump `EncodedLogosDomain`'s
 //! `LayoutVersion` in `src/domain.rs`, document why the archived shape moved, and
 //! update the constant below DELIBERATELY to the new hash. Do not "fix" the test by
 //! pasting the new hash without bumping the layout version — that reproduces the
@@ -19,21 +19,18 @@
 mod support;
 
 use content_identity::HashDomain;
-use core_logos::CoreLogosDomain;
+use core_logos::EncodedLogosDomain;
 use name_table::NameTable;
 
 /// The content identity of the `CommitSequence` golden newtype under the current
-/// CoreLogos layout, as a lowercase hex blake3 digest. Pinned at layout 6, the
-/// version that adds the ordinary-exchange envelope vocabulary to the archived shape
-/// (the `Expression` algebra grew the `StructLiteral` node the `into_frame` /
-/// `into_reply_frame` bodies construct, enlarging the fixed-size `CoreItem` archived
-/// bytes). `commit_sequence` uses none of the new nodes, so its projection is
-/// unchanged; only its archived bytes — and therefore this pinned digest — moved with
-/// the layout. The value is a deterministic function of the golden fixture:
-/// `commit_sequence` interns into a fresh NameTable in a fixed order, so the stored
-/// identifier indices — and thus the archived bytes — are reproducible.
-const COMMIT_SEQUENCE_IDENTITY_LAYOUT_6: &str =
-    "8553cb87a1be10e2c7634a913aba1c3fe4bf15840b649d5e39fec334a6667301";
+/// EncodedLogos layout, as a lowercase hex blake3 digest. Layout 7 adopts
+/// namespace-variant `Identifier` values with `u16` locals, replacing the former
+/// flat identifier representation in every archived EncodedLogos value, and names
+/// the canonical EncodedLogos hash context. The golden fixture allocates its names
+/// in the Logos namespace in a fixed order, so its archived bytes — and this
+/// witness — are reproducible.
+const COMMIT_SEQUENCE_IDENTITY_LAYOUT_7: &str =
+    "3f2d85f564a74df7962f4e9a110fdab92b1dc1899edd8f418314e254f285e73d";
 
 #[test]
 fn commit_sequence_identity_is_pinned_under_the_current_layout() {
@@ -41,20 +38,20 @@ fn commit_sequence_identity_is_pinned_under_the_current_layout() {
     // reports. If the domain moved to a new layout, the constant above is stale by
     // definition and must be re-derived deliberately.
     assert_eq!(
-        CoreLogosDomain::layout_version().value(),
-        6,
+        EncodedLogosDomain::layout_version().value(),
+        7,
         "the witnessed layout version moved; re-derive the pinned hash deliberately",
     );
 
-    let mut names = NameTable::new();
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
     let item = support::commit_sequence(&mut names);
     let identity = item.content_identity().expect("content identity");
 
     assert_eq!(
         identity.to_hexadecimal(),
-        COMMIT_SEQUENCE_IDENTITY_LAYOUT_6,
+        COMMIT_SEQUENCE_IDENTITY_LAYOUT_7,
         "the archived representation of CommitSequence changed — this is a layout \
-         event: bump CoreLogosDomain's LayoutVersion in src/domain.rs, document why \
+         event: bump EncodedLogosDomain's LayoutVersion in src/domain.rs, document why \
          the archived shape moved, and update this constant deliberately",
     );
 }
