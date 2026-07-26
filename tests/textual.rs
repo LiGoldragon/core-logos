@@ -29,8 +29,8 @@ use core_logos::{
     Attribute, ConfigurationAttribute, ConfigurationPredicate, DeriveGroup, EncodedItem, Newtype,
     PathNode, TypeReference, Visibility,
 };
-use name_table::{Identifier, Name, NameResolver, NameTable, NameTableError};
-use raw_discovery::{Delimiter, RecognizeError};
+use name_table::{Identifier, Name, NameResolver, NameTable, NameTableError, NameTransaction};
+use raw_discovery::{Delimiter, RawProfile, SealedTokenProfile, TriggerIdentifier, TriggerSet};
 use structural_codec::ids::{EncodedConstructorId, PositionalSignature, ScopedEncodedTypeId};
 use structural_codec::table::{
     AddressedStructuralTable, EncodedLayoutIdentity, RawProfileIdentity, TableIdentityPayload,
@@ -54,6 +54,12 @@ const CONFIG_PREDICATE: ScopedEncodedTypeId = ScopedEncodedTypeId::fixture(4);
 const PATH_NODE: ScopedEncodedTypeId = ScopedEncodedTypeId::fixture(5);
 const TYPE_REFERENCE: ScopedEncodedTypeId = ScopedEncodedTypeId::fixture(6);
 
+const SQUARE_BOUNDARY: TriggerIdentifier = TriggerIdentifier::new(1);
+const BRACE_BOUNDARY: TriggerIdentifier = TriggerIdentifier::new(2);
+const APPLICATION_OPERATOR: TriggerIdentifier = TriggerIdentifier::new(3);
+const WHITESPACE_TRIVIA: TriggerIdentifier = TriggerIdentifier::new(5);
+const COMMENT_TRIVIA: TriggerIdentifier = TriggerIdentifier::new(6);
+
 // The constructor indices inside each type's entry — the disjoint decode alternatives.
 const VISIBILITY_PUBLIC: u32 = 0;
 const VISIBILITY_PRIVATE: u32 = 1;
@@ -66,8 +72,6 @@ const PATH_MULTI: u32 = 1;
 /// A Textual round-trip over EncodedLogos failed.
 #[derive(Debug, thiserror::Error)]
 enum LogosTextError {
-    #[error(transparent)]
-    Recognize(#[from] RecognizeError),
     #[error(transparent)]
     Decode(#[from] DecodeError),
     #[error(transparent)]
@@ -98,7 +102,7 @@ struct Lexicon {
 
 impl Lexicon {
     fn build() -> Self {
-        let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
+        let mut names = NameTable::new(name_table::IdentifierNamespace::LogosStandard);
         let mut keyword = |text: &str| {
             names
                 .intern(Name::new(text))
@@ -127,6 +131,7 @@ impl Lexicon {
 /// One textual mouth of EncodedLogos: the sealed structuretree plus the keyword lexicon.
 struct TextualLogos {
     table: AddressedStructuralTable,
+    token_profile: SealedTokenProfile,
     lexicon: Lexicon,
 }
 
@@ -135,6 +140,9 @@ impl TextualLogos {
     /// entry's decode alternatives pairwise disjoint.
     fn build() -> Self {
         let lexicon = Lexicon::build();
+        let token_profile = RawProfile::standard()
+            .seal()
+            .expect("seal the standard token profile");
         let entries = vec![
             Self::item_entry(&lexicon),
             Self::visibility_entry(&lexicon),
@@ -146,18 +154,24 @@ impl TextualLogos {
         let payload = TableIdentityPayload {
             core_universe: structural_codec::ids::FIXTURE_UNIVERSE,
             core_layout_identity: EncodedLayoutIdentity([7u8; 32]),
-            raw_profile_identity: RawProfileIdentity([1u8; 32]),
+            raw_profile_identity: RawProfileIdentity::from_profile(&token_profile),
+            trivia_triggers: TriggerSet::new(vec![WHITESPACE_TRIVIA, COMMENT_TRIVIA]),
             leaf_codec_contracts: Vec::new(),
             entries: entries
                 .into_iter()
                 .map(|entry| (entry.core_type, entry))
                 .collect(),
         };
-        let table = AddressedStructuralTable::seal(payload).expect("seal the logos structuretree");
+        let table = AddressedStructuralTable::seal(payload, &token_profile)
+            .expect("seal the logos structuretree");
         table
             .validate_disjoint()
             .expect("every decode alternative is provably disjoint");
-        Self { table, lexicon }
+        Self {
+            table,
+            token_profile,
+            lexicon,
+        }
     }
 
     // ===== structuretree authoring =====
@@ -186,12 +200,17 @@ impl TextualLogos {
 
     /// A `Head.payload` application whose head is a structural keyword `Literal`.
     fn keyword_application(keyword: Identifier, payload: StructuralForm) -> StructuralForm {
-        StructuralForm::application(StructuralForm::Literal(keyword), payload)
+        StructuralForm::application(
+            APPLICATION_OPERATOR,
+            StructuralForm::Literal(keyword),
+            payload,
+        )
     }
 
     /// A `[ … ]` vector of a repeated element.
     fn vector(element: StructuralForm) -> StructuralForm {
         StructuralForm::Delimited {
+            boundary: SQUARE_BOUNDARY,
             delimiter: Delimiter::SquareBracket,
             sequence: SequenceForm::zero_or_more(element),
         }
@@ -202,6 +221,7 @@ impl TextualLogos {
     /// five positional fields in declaration order.
     fn item_entry(lexicon: &Lexicon) -> StructuralEntry {
         let body = StructuralForm::Delimited {
+            boundary: BRACE_BOUNDARY,
             delimiter: Delimiter::Brace,
             sequence: SequenceForm::Product(vec![
                 StructuralForm::delegate(VISIBILITY),
@@ -243,6 +263,7 @@ impl TextualLogos {
         let configuration = Self::keyword_application(
             lexicon.configuration,
             StructuralForm::Delimited {
+                boundary: BRACE_BOUNDARY,
                 delimiter: Delimiter::Brace,
                 sequence: SequenceForm::Product(vec![
                     StructuralForm::delegate(CONFIG_PREDICATE),
@@ -277,6 +298,7 @@ impl TextualLogos {
     fn path_node_entry() -> StructuralEntry {
         let single = StructuralForm::Atom(AtomForm::any_case());
         let multi = StructuralForm::application(
+            APPLICATION_OPERATOR,
             StructuralForm::Atom(AtomForm::any_case()),
             StructuralForm::delegate(PATH_NODE),
         );
@@ -300,7 +322,7 @@ impl TextualLogos {
     fn reify_item(
         &self,
         mirror: &StructuralValue,
-        names: &mut NameTable,
+        names: &mut NameTransaction<'_>,
     ) -> Result<EncodedItem, LogosTextError> {
         let (constructor, payload) = Self::chosen(mirror, "item")?;
         // Only the Newtype constructor is authored for the golden witness.
@@ -332,7 +354,7 @@ impl TextualLogos {
     fn reify_attributes(
         &self,
         mirror: &StructuralValue,
-        names: &mut NameTable,
+        names: &mut NameTransaction<'_>,
     ) -> Result<Vec<Attribute>, LogosTextError> {
         let elements = Self::delimited_vec(mirror, "attributes vector")?;
         elements
@@ -347,7 +369,7 @@ impl TextualLogos {
     fn reify_attribute(
         &self,
         mirror: &StructuralValue,
-        names: &mut NameTable,
+        names: &mut NameTransaction<'_>,
     ) -> Result<Attribute, LogosTextError> {
         let (constructor, payload) = Self::chosen(mirror, "attribute")?;
         let body = Self::application_body(payload, "attribute application")?;
@@ -383,7 +405,7 @@ impl TextualLogos {
     fn reify_predicate(
         &self,
         mirror: &StructuralValue,
-        _names: &mut NameTable,
+        _names: &mut NameTransaction<'_>,
     ) -> Result<ConfigurationPredicate, LogosTextError> {
         let inner = Self::delegated(mirror, "predicate delegate")?;
         let (constructor, payload) = Self::chosen(inner, "predicate")?;
@@ -428,86 +450,73 @@ impl TextualLogos {
 
     // ===== reflect: EncodedLogos -> StructuralValue mirror =====
 
-    fn reflect_item(
-        &self,
-        item: &EncodedItem,
-        names: &mut NameTable,
-    ) -> Result<StructuralValue, LogosTextError> {
+    fn reflect_item(&self, item: &EncodedItem) -> Result<StructuralValue, LogosTextError> {
         let EncodedItem::Newtype(newtype) = item else {
             return Err(LogosTextError::ReifyShape(
                 "only Newtype items are authored",
             ));
         };
         let body = StructuralValue::Delimited(vec![
-            self.reflect_visibility(&newtype.visibility, names),
-            self.reflect_attributes(&newtype.attributes, names)?,
+            self.reflect_visibility(&newtype.visibility),
+            self.reflect_attributes(&newtype.attributes)?,
             StructuralValue::Atom(newtype.name),
-            self.reflect_visibility(&newtype.wrapped_visibility, names),
-            self.reflect_type(&newtype.wrapped, names)?,
+            self.reflect_visibility(&newtype.wrapped_visibility),
+            self.reflect_type(&newtype.wrapped)?,
         ]);
         Ok(StructuralValue::chosen(
             0,
             StructuralValue::Application(
-                Box::new(StructuralValue::Atom(self.keyword(names, "Newtype"))),
+                Box::new(StructuralValue::Atom(self.lexicon.newtype)),
                 Box::new(body),
             ),
         ))
     }
 
-    fn reflect_visibility(
-        &self,
-        visibility: &Visibility,
-        names: &mut NameTable,
-    ) -> StructuralValue {
+    fn reflect_visibility(&self, visibility: &Visibility) -> StructuralValue {
         let (constructor, keyword) = match visibility {
-            Visibility::Public => (VISIBILITY_PUBLIC, "Public"),
-            Visibility::Private => (VISIBILITY_PRIVATE, "Private"),
+            Visibility::Public => (VISIBILITY_PUBLIC, self.lexicon.public),
+            Visibility::Private => (VISIBILITY_PRIVATE, self.lexicon.private),
             // Crate / Module are deferred; the golden uses only Public / Private.
             other => panic!("visibility {other:?} is not authored yet"),
         };
         StructuralValue::Delegated(Box::new(StructuralValue::chosen(
             constructor,
-            StructuralValue::Atom(self.keyword(names, keyword)),
+            StructuralValue::Atom(keyword),
         )))
     }
 
     fn reflect_attributes(
         &self,
         attributes: &[Attribute],
-        names: &mut NameTable,
     ) -> Result<StructuralValue, LogosTextError> {
         let elements = attributes
             .iter()
             .map(|attribute| {
                 Ok(StructuralValue::Delegated(Box::new(
-                    self.reflect_attribute(attribute, names)?,
+                    self.reflect_attribute(attribute)?,
                 )))
             })
             .collect::<Result<Vec<_>, LogosTextError>>()?;
         Ok(StructuralValue::Delimited(elements))
     }
 
-    fn reflect_attribute(
-        &self,
-        attribute: &Attribute,
-        names: &mut NameTable,
-    ) -> Result<StructuralValue, LogosTextError> {
+    fn reflect_attribute(&self, attribute: &Attribute) -> Result<StructuralValue, LogosTextError> {
         match attribute {
             Attribute::ToolPath(path) => Ok(Self::keyword_chosen(
                 ATTRIBUTE_TOOL_PATH,
-                self.keyword(names, "ToolPath"),
+                self.lexicon.tool_path,
                 StructuralValue::Delegated(Box::new(Self::reflect_path(path))),
             )),
             Attribute::Configuration(configuration) => {
                 let body = StructuralValue::Delimited(vec![
-                    self.reflect_predicate(&configuration.predicate, names),
+                    self.reflect_predicate(&configuration.predicate),
                     StructuralValue::Delegated(Box::new(
-                        self.reflect_attribute(&configuration.inner, names)?,
+                        self.reflect_attribute(&configuration.inner)?,
                     )),
                 ]);
                 Ok(Self::keyword_chosen(
                     ATTRIBUTE_CONFIGURATION,
-                    self.keyword(names, "Configuration"),
+                    self.lexicon.configuration,
                     body,
                 ))
             }
@@ -519,7 +528,7 @@ impl TextualLogos {
                     .collect();
                 Ok(Self::keyword_chosen(
                     ATTRIBUTE_DERIVE,
-                    self.keyword(names, "Derive"),
+                    self.lexicon.derive,
                     StructuralValue::Delimited(paths),
                 ))
             }
@@ -531,16 +540,12 @@ impl TextualLogos {
         }
     }
 
-    fn reflect_predicate(
-        &self,
-        predicate: &ConfigurationPredicate,
-        names: &mut NameTable,
-    ) -> StructuralValue {
+    fn reflect_predicate(&self, predicate: &ConfigurationPredicate) -> StructuralValue {
         let ConfigurationPredicate::Feature(feature) = predicate;
         StructuralValue::Delegated(Box::new(StructuralValue::chosen(
             0,
             StructuralValue::Application(
-                Box::new(StructuralValue::Atom(self.keyword(names, "Feature"))),
+                Box::new(StructuralValue::Atom(self.lexicon.feature)),
                 Box::new(StructuralValue::Atom(*feature)),
             ),
         )))
@@ -549,7 +554,6 @@ impl TextualLogos {
     fn reflect_type(
         &self,
         type_reference: &TypeReference,
-        _names: &mut NameTable,
     ) -> Result<StructuralValue, LogosTextError> {
         let TypeReference::Path(path) = type_reference else {
             return Err(LogosTextError::ReifyShape(
@@ -598,13 +602,6 @@ impl TextualLogos {
                 Box::new(payload),
             ),
         )
-    }
-
-    fn keyword(&self, names: &mut NameTable, text: &str) -> Identifier {
-        let _ = &self.lexicon;
-        names
-            .intern(Name::new(text))
-            .expect("allocate textual keyword")
     }
 
     fn chosen<'value>(
@@ -678,6 +675,10 @@ impl Textual for TextualLogos {
         &self.table
     }
 
+    fn token_profile(&self) -> &SealedTokenProfile {
+        &self.token_profile
+    }
+
     fn lexicon(&self) -> Option<&dyn NameResolver> {
         Some(&self.lexicon.names)
     }
@@ -690,7 +691,7 @@ impl Textual for TextualLogos {
         &self,
         _expected: ScopedEncodedTypeId,
         mirror: &StructuralValue,
-        names: &mut NameTable,
+        names: &mut NameTransaction<'_>,
     ) -> Result<EncodedItem, LogosTextError> {
         self.reify_item(mirror, names)
     }
@@ -699,9 +700,9 @@ impl Textual for TextualLogos {
         &self,
         _expected: ScopedEncodedTypeId,
         encoded: &EncodedItem,
-        names: &mut NameTable,
+        _names: &NameTable,
     ) -> Result<StructuralValue, LogosTextError> {
-        self.reflect_item(encoded, names)
+        self.reflect_item(encoded)
     }
 }
 
@@ -711,13 +712,14 @@ impl Textual for TextualLogos {
 #[test]
 fn golden_commit_sequence_round_trips_through_the_organs() {
     let mouth = TextualLogos::build();
-    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos);
+    let mut names = NameTable::new(name_table::IdentifierNamespace::Logos)
+        .compose(&mouth.lexicon.names)
+        .expect("compose the Logos standard lexicon");
     let golden = support::commit_sequence(&mut names);
 
     // view: the EncodedForm value -> canonical Protos text through the organs. Text
     // crosses only inside the mouth's `TextualForm<LogosLanguage>` value.
-    let text: TextualForm<LogosLanguage> =
-        mouth.view(ITEM, &golden, &mut names).expect("view golden");
+    let text: TextualForm<LogosLanguage> = mouth.view(ITEM, &golden, &names).expect("view golden");
     let text_str = text.sole_text().expect("sole view text");
     println!("golden CommitSequence text:\n{text_str}");
 
@@ -755,7 +757,7 @@ fn golden_commit_sequence_round_trips_through_the_organs() {
     assert_eq!(golden, decoded, "value -> text -> value is lossless");
 
     // The recovered value re-views to byte-identical text.
-    let re_viewed = mouth.view(ITEM, &decoded, &mut names).expect("re-view");
+    let re_viewed = mouth.view(ITEM, &decoded, &names).expect("re-view");
     assert_eq!(
         text, re_viewed,
         "the canonical text is stable across the round-trip"
