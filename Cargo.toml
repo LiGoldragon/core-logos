@@ -19,7 +19,7 @@ rkyv             = { version = "0.8", default-features = false, features = ["std
 thiserror        = "2"
 
 [dev-dependencies]
-core-schema      = { git = "https://github.com/LiGoldragon/core-schema.git", rev = "1e344ce460292812a59256c99c88a3a31b5f120b" }
+core-schema      = { git = "https://github.com/LiGoldragon/core-schema.git", rev = "4197306e43ca28500115660d31fb298dae42727e" }
 structural-codec = { git = "https://github.com/LiGoldragon/structural-codec.git", rev = "9103ec94579cf7892fac7e20e1ef7beb77153673" }
 raw-discovery    = { git = "https://github.com/LiGoldragon/raw-discovery.git", rev = "c27a9efabb1981c8b3d887c870fff82fc7daf49c" }
 
