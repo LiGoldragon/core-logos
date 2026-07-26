@@ -20,7 +20,7 @@ thiserror        = "2"
 
 [dev-dependencies]
 core-schema      = { git = "https://github.com/LiGoldragon/core-schema.git", rev = "1e344ce460292812a59256c99c88a3a31b5f120b" }
-structural-codec = { git = "https://github.com/LiGoldragon/structural-codec.git", rev = "e5fa1b3bbdde13f3dac205920b16a2e73f3d4487" }
+structural-codec = { git = "https://github.com/LiGoldragon/structural-codec.git", rev = "9103ec94579cf7892fac7e20e1ef7beb77153673" }
 raw-discovery    = { git = "https://github.com/LiGoldragon/raw-discovery.git", rev = "c27a9efabb1981c8b3d887c870fff82fc7daf49c" }
 
 [lints.rust]
