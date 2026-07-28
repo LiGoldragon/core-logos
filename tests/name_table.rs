@@ -1,31 +1,31 @@
-//! NameTable composition between the schema and Logos namespaces.
+//! NameTable composition between the Ethos and Logos namespaces.
 
 mod support;
 
-use core_schema::FixtureFamily;
+use core_ethos::FixtureFamily;
 use name_table::{Identifier, IdentifierNamespace, Name, NameTable};
 
 #[test]
-fn composing_a_schema_slice_preserves_identifiers_and_allocates_logos_rows() {
+fn composing_an_ethos_slice_preserves_identifiers_and_allocates_logos_rows() {
     let family = FixtureFamily::build();
-    let schema = family.universe().names();
-    let schema_len = schema.len();
+    let ethos = family.universe().names();
+    let ethos_len = ethos.len();
     assert!(
-        schema_len > 0,
-        "the core-schema fixture populates its own namespace"
+        ethos_len > 0,
+        "the core-ethos fixture populates its upstream compatibility namespace"
     );
 
     let mut logos = NameTable::new(IdentifierNamespace::Logos)
-        .compose(schema)
+        .compose(ethos)
         .expect("a Logos table can borrow the Schema slice");
 
-    for index in 0..schema_len {
+    for index in 0..ethos_len {
         let identifier = Identifier::Schema(index as u16);
         assert_eq!(
             logos
                 .resolve(identifier)
                 .expect("schema identifier resolves"),
-            schema
+            ethos
                 .resolve(identifier)
                 .expect("schema identifier resolves")
         );

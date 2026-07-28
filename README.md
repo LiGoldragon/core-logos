@@ -52,5 +52,5 @@ cargo test           # inner-loop tests
 ```
 
 Published as `0.2.0`. Consumes `content-identity` and `name-table` as pinned git
-dependencies (`core-schema` is a dev-dependency, for the NameTable-continuity
+dependencies (`core-ethos` is a dev-dependency, for the NameTable-continuity
 test).

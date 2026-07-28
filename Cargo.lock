@@ -96,11 +96,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-logos"
-version = "0.2.0"
+name = "core-ethos"
+version = "0.9.0"
+source = "git+https://github.com/LiGoldragon/core-ethos.git?rev=42fbbc08877a89958cc7ebc50814fc1e7247b038#42fbbc08877a89958cc7ebc50814fc1e7247b038"
 dependencies = [
  "content-identity",
- "core-schema",
  "name-table",
  "raw-discovery",
  "rkyv",
@@ -109,11 +109,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-schema"
-version = "0.8.0"
-source = "git+https://github.com/LiGoldragon/core-schema.git?rev=6067b526ab0e9c0e90389543de03d2cd7bd6202a#6067b526ab0e9c0e90389543de03d2cd7bd6202a"
+name = "core-logos"
+version = "0.2.0"
 dependencies = [
  "content-identity",
+ "core-ethos",
  "name-table",
  "raw-discovery",
  "rkyv",

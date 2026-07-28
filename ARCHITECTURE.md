@@ -320,7 +320,7 @@ the domain preamble as well. The `CommitSequence` absolute witness at layout 7 i
 ## Release-train status
 
 The crate **git-pins** its published dependencies (`content-identity`,
-`name-table`, and the `core-schema` dev-dependency) at exact revisions — the green
+`name-table`, and the `core-ethos` dev-dependency) at exact revisions — the green
 path. It rides the multi-repository release train pending this session's
 delta-audit; the git pins hold the reproducible build meanwhile. Cargo, Nix, and
 cache authority stay separate: the lock file carries the revisions, and
