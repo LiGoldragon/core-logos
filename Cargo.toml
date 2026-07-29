@@ -1,6 +1,6 @@
 [package]
 name         = "core-logos"
-version      = "0.4.0"
+version      = "0.5.0"
 edition      = "2024"
 rust-version = "1.85"
 license      = "MIT OR Apache-2.0"
@@ -23,7 +23,7 @@ rkyv                     = { version = "0.8", default-features = false, features
 thiserror                = "2"
 
 [dev-dependencies]
-core-ethos       = { git = "https://github.com/LiGoldragon/core-ethos.git", rev = "b9db643a853b1f52f10a4100a791d5dbc8c7240d" }
+core-ethos       = { git = "https://github.com/LiGoldragon/core-ethos.git", rev = "1117a85a8d1d6f0ca2836ec7507e04b3a1d34f40" }
 structural-codec = { git = "https://github.com/LiGoldragon/structural-codec.git", rev = "23497c43f81b619158e5cfbd83a012eb63c4186f" }
 raw-discovery    = { git = "https://github.com/LiGoldragon/raw-discovery.git", rev = "2ac78f621980fa02daa3b31e90cc5c73570eed6e" }
 

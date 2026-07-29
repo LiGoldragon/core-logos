@@ -1,15 +1,17 @@
 use capsule_content_identity::{IdentityHasher, PortableArchive};
 use core_logos::{
-    WholeLogos, WholeLogosContentIdentity, WholeLogosItem, WholeLogosNewtype, WholeLogosVisibility,
+    WholeLogos, WholeLogosContentIdentity, WholeLogosEnumeration, WholeLogosItem,
+    WholeLogosNewtype, WholeLogosTupleFields, WholeLogosTypeApplication, WholeLogosTypeReference,
+    WholeLogosVariant, WholeLogosVariantPayload, WholeLogosVisibility,
 };
 use encoded_name_table::LocalEncodedId;
 use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
 
-// Version 1 fixes the first positional WholeLogos archive and its pure-content
+// Version 2 fixes the enum/application WholeLogos archive and its pure-content
 // hash. An intentional archive change replaces this under a new versioned name.
-const WHOLE_LOGOS_ARCHIVE_V1_IDENTITY: [u8; 32] = [
-    0x24, 0x00, 0xe6, 0x0a, 0x77, 0xcf, 0x44, 0x20, 0x36, 0xe7, 0x88, 0xcd, 0xd4, 0xd9, 0x1a, 0xaf,
-    0x7b, 0x2f, 0x44, 0x64, 0x63, 0xec, 0xce, 0xd6, 0xa8, 0xf5, 0x01, 0xc2, 0xab, 0x23, 0x8d, 0x29,
+const WHOLE_LOGOS_ARCHIVE_V2_IDENTITY: [u8; 32] = [
+    0x79, 0xcd, 0x05, 0xdc, 0xde, 0x82, 0x58, 0x6c, 0xcc, 0xfd, 0xd8, 0x64, 0x7a, 0x9e, 0x8e, 0x10,
+    0xce, 0x12, 0x5b, 0x41, 0x8b, 0xe9, 0xff, 0x00, 0x83, 0xca, 0x80, 0x37, 0xb7, 0x8c, 0x33, 0x83,
 ];
 
 fn encoded_id(root: VocabularyRoot, chain: &[u16]) -> VocabularyEncodedId {
@@ -25,7 +27,7 @@ fn newtype(name: &[u16], wrapped: &[u16]) -> WholeLogosItem {
         WholeLogosVisibility::Public,
         encoded_id(VocabularyRoot::Universal, name),
         WholeLogosVisibility::Private,
-        encoded_id(VocabularyRoot::Universal, wrapped),
+        WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, wrapped)),
     ))
 }
 
@@ -38,13 +40,61 @@ fn hash(whole: &WholeLogos) -> [u8; 32] {
 }
 
 #[test]
+fn enum_and_application_shapes_retain_every_complete_chain_through_archive() {
+    let vector = encoded_id(VocabularyRoot::Universal, &[4]);
+    let integer = encoded_id(VocabularyRoot::Universal, &[3]);
+    let application = WholeLogosTypeReference::Application(WholeLogosTypeApplication::new(
+        vector.clone(),
+        WholeLogosTypeReference::Identity(integer.clone()),
+    ));
+    let original = WholeLogos::new(vec![
+        WholeLogosItem::Newtype(WholeLogosNewtype::new(
+            WholeLogosVisibility::Public,
+            encoded_id(VocabularyRoot::Universal, &[8, 5]),
+            WholeLogosVisibility::Private,
+            application.clone(),
+        )),
+        WholeLogosItem::Enumeration(WholeLogosEnumeration::new(
+            WholeLogosVisibility::Public,
+            encoded_id(VocabularyRoot::Universal, &[8, 6]),
+            vec![
+                WholeLogosVariant::new(
+                    encoded_id(VocabularyRoot::Universal, &[8, 6, 1]),
+                    WholeLogosVariantPayload::Unit,
+                ),
+                WholeLogosVariant::new(
+                    encoded_id(VocabularyRoot::Universal, &[8, 6, 2]),
+                    WholeLogosVariantPayload::Tuple(
+                        WholeLogosTupleFields::new(vec![
+                            WholeLogosTypeReference::Identity(integer),
+                            application,
+                        ])
+                        .expect("non-empty tuple"),
+                    ),
+                ),
+            ],
+        )),
+    ]);
+
+    let archive = original
+        .to_archive_bytes()
+        .expect("archive broadened carrier");
+    assert_eq!(
+        WholeLogos::from_archive_bytes(&archive).expect("restore broadened carrier"),
+        original
+    );
+}
+
+#[test]
 fn ordered_typed_items_and_complete_encoded_id_chains_survive_archive() {
     let original = WholeLogos::new(vec![newtype(&[17, 23, 41], &[3, 5])]);
     let bytes = original.to_archive_bytes().expect("archive whole Logos");
     let restored = WholeLogos::from_archive_bytes(&bytes).expect("restore whole Logos");
 
     assert_eq!(restored, original);
-    let WholeLogosItem::Newtype(newtype) = &restored.items()[0];
+    let WholeLogosItem::Newtype(newtype) = &restored.items()[0] else {
+        panic!("newtype fixture")
+    };
     assert_eq!(
         newtype
             .name()
@@ -55,16 +105,24 @@ fn ordered_typed_items_and_complete_encoded_id_chains_survive_archive() {
         vec![17, 23, 41],
     );
     assert_eq!(
-        newtype
-            .wrapped()
-            .chain()
-            .iter()
-            .map(|local| local.value())
-            .collect::<Vec<_>>(),
+        match newtype.wrapped() {
+            WholeLogosTypeReference::Identity(identity) => identity,
+            WholeLogosTypeReference::Application(_) => panic!("identity reference"),
+        }
+        .chain()
+        .iter()
+        .map(|local| local.value())
+        .collect::<Vec<_>>(),
         vec![3, 5],
     );
     assert_eq!(newtype.name().root_variant(), &VocabularyRoot::Universal);
-    assert_eq!(newtype.wrapped().root_variant(), &VocabularyRoot::Universal);
+    assert_eq!(
+        match newtype.wrapped() {
+            WholeLogosTypeReference::Identity(identity) => identity.root_variant(),
+            WholeLogosTypeReference::Application(_) => panic!("identity reference"),
+        },
+        &VocabularyRoot::Universal
+    );
 }
 
 #[test]
@@ -97,7 +155,7 @@ fn the_whole_logos_variant_is_outside_the_pure_content_hash() {
     let identity = whole.content_identity().expect("whole content identity");
     assert!(matches!(identity, WholeLogosContentIdentity::WholeLogos(_)));
     assert_eq!(identity.content_addressed_hash().bytes(), &expected);
-    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V1_IDENTITY);
+    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V2_IDENTITY);
 }
 
 #[test]

@@ -2,13 +2,13 @@
 //!
 //! This is deliberately separate from the legacy per-item algebra. Every name
 //! position carries a complete production encoded-ID chain, while the supported
-//! item vocabulary is only the attribute-free, non-generic tuple newtype needed
-//! by the first executable witness.
+//! item vocabulary is limited to attribute-free newtypes and non-generic
+//! enumerations with unit or positional tuple variants.
 
 use capsule_content_identity::{
     ArchiveError, ContentAddressedHash, IdentityHasher, PortableArchive,
 };
-use signal_sema_translator::VocabularyEncodedId;
+use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
 
 /// Ordered, canonical whole-Logos content.
 ///
@@ -71,17 +71,38 @@ impl WholeLogos {
         for (item_index, item) in self.0.iter().enumerate() {
             match item {
                 WholeLogosItem::Newtype(newtype) => {
-                    if newtype.name().chain().is_empty() {
-                        return Err(WholeLogosArchiveError::EmptyEncodedId {
+                    validate_universal(
+                        item_index,
+                        WholeLogosEncodedIdPosition::ItemName,
+                        newtype.name(),
+                    )?;
+                    validate_reference(
+                        item_index,
+                        WholeLogosEncodedIdPosition::NewtypeField,
+                        newtype.wrapped(),
+                    )?;
+                }
+                WholeLogosItem::Enumeration(enumeration) => {
+                    validate_universal(
+                        item_index,
+                        WholeLogosEncodedIdPosition::ItemName,
+                        enumeration.name(),
+                    )?;
+                    for variant in enumeration.variants() {
+                        validate_universal(
                             item_index,
-                            position: NewtypeEncodedIdPosition::Name,
-                        });
-                    }
-                    if newtype.wrapped().chain().is_empty() {
-                        return Err(WholeLogosArchiveError::EmptyEncodedId {
-                            item_index,
-                            position: NewtypeEncodedIdPosition::Wrapped,
-                        });
+                            WholeLogosEncodedIdPosition::VariantName,
+                            variant.name(),
+                        )?;
+                        if let WholeLogosVariantPayload::Tuple(fields) = variant.payload() {
+                            for field in fields.fields() {
+                                validate_reference(
+                                    item_index,
+                                    WholeLogosEncodedIdPosition::VariantField,
+                                    field,
+                                )?;
+                            }
+                        }
                     }
                 }
             }
@@ -90,11 +111,54 @@ impl WholeLogos {
     }
 }
 
+fn validate_universal(
+    item_index: usize,
+    position: WholeLogosEncodedIdPosition,
+    encoded_id: &VocabularyEncodedId,
+) -> Result<(), WholeLogosArchiveError> {
+    if encoded_id.chain().is_empty() {
+        return Err(WholeLogosArchiveError::EmptyEncodedId {
+            item_index,
+            position,
+        });
+    }
+    if encoded_id.root_variant() != &VocabularyRoot::Universal {
+        return Err(WholeLogosArchiveError::NonUniversalEncodedId {
+            item_index,
+            position,
+            root: *encoded_id.root_variant(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_reference(
+    item_index: usize,
+    position: WholeLogosEncodedIdPosition,
+    reference: &WholeLogosTypeReference,
+) -> Result<(), WholeLogosArchiveError> {
+    match reference {
+        WholeLogosTypeReference::Identity(encoded_id) => {
+            validate_universal(item_index, position, encoded_id)
+        }
+        WholeLogosTypeReference::Application(application) => {
+            validate_universal(
+                item_index,
+                WholeLogosEncodedIdPosition::ApplicationHead,
+                application.head(),
+            )?;
+            validate_reference(item_index, position, application.payload())
+        }
+    }
+}
+
 /// The closed item vocabulary admitted by [`WholeLogos`] in the first slice.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub enum WholeLogosItem {
     /// An attribute-free, non-generic tuple newtype.
     Newtype(WholeLogosNewtype),
+    /// An attribute-free, non-generic enumeration.
+    Enumeration(WholeLogosEnumeration),
 }
 
 /// An attribute-free, non-generic tuple newtype, stored positionally.
@@ -108,7 +172,7 @@ pub struct WholeLogosNewtype(
     WholeLogosVisibility,
     VocabularyEncodedId,
     WholeLogosVisibility,
-    VocabularyEncodedId,
+    WholeLogosTypeReference,
 );
 
 impl WholeLogosNewtype {
@@ -117,7 +181,7 @@ impl WholeLogosNewtype {
         visibility: WholeLogosVisibility,
         name: VocabularyEncodedId,
         wrapped_visibility: WholeLogosVisibility,
-        wrapped: VocabularyEncodedId,
+        wrapped: WholeLogosTypeReference,
     ) -> Self {
         Self(visibility, name, wrapped_visibility, wrapped)
     }
@@ -138,10 +202,137 @@ impl WholeLogosNewtype {
     }
 
     /// The wrapped type's complete encoded-ID chain.
-    pub const fn wrapped(&self) -> &VocabularyEncodedId {
+    pub const fn wrapped(&self) -> &WholeLogosTypeReference {
         &self.3
     }
 }
+
+/// Positional type reference carried by Whole Logos.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub enum WholeLogosTypeReference {
+    /// One complete Universal encoded-ID chain.
+    Identity(VocabularyEncodedId),
+    /// One unary application.
+    Application(WholeLogosTypeApplication),
+}
+
+/// Application head and its one positional payload.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+#[rkyv(
+    serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
+    deserialize_bounds(__D::Error: rkyv::rancor::Source),
+    bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
+)]
+pub struct WholeLogosTypeApplication(
+    VocabularyEncodedId,
+    #[rkyv(omit_bounds)] Box<WholeLogosTypeReference>,
+);
+
+impl WholeLogosTypeApplication {
+    /// Construct a unary application.
+    pub fn new(head: VocabularyEncodedId, payload: WholeLogosTypeReference) -> Self {
+        Self(head, Box::new(payload))
+    }
+
+    /// Complete application-head identity.
+    pub const fn head(&self) -> &VocabularyEncodedId {
+        &self.0
+    }
+
+    /// Positional payload reference.
+    pub const fn payload(&self) -> &WholeLogosTypeReference {
+        &self.1
+    }
+}
+
+/// Attribute-free, non-generic enumeration stored positionally.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosEnumeration(
+    WholeLogosVisibility,
+    VocabularyEncodedId,
+    Vec<WholeLogosVariant>,
+);
+
+impl WholeLogosEnumeration {
+    /// Construct one enumeration.
+    pub fn new(
+        visibility: WholeLogosVisibility,
+        name: VocabularyEncodedId,
+        variants: Vec<WholeLogosVariant>,
+    ) -> Self {
+        Self(visibility, name, variants)
+    }
+
+    /// Item visibility.
+    pub const fn visibility(&self) -> &WholeLogosVisibility {
+        &self.0
+    }
+
+    /// Complete declaration identity.
+    pub const fn name(&self) -> &VocabularyEncodedId {
+        &self.1
+    }
+
+    /// Variants in semantic order.
+    pub fn variants(&self) -> &[WholeLogosVariant] {
+        &self.2
+    }
+}
+
+/// One enumeration variant.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosVariant(VocabularyEncodedId, WholeLogosVariantPayload);
+
+impl WholeLogosVariant {
+    /// Construct one variant.
+    pub fn new(name: VocabularyEncodedId, payload: WholeLogosVariantPayload) -> Self {
+        Self(name, payload)
+    }
+
+    /// Complete declaration identity.
+    pub const fn name(&self) -> &VocabularyEncodedId {
+        &self.0
+    }
+
+    /// Unit or positional tuple payload.
+    pub const fn payload(&self) -> &WholeLogosVariantPayload {
+        &self.1
+    }
+}
+
+/// Closed variant-payload vocabulary.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub enum WholeLogosVariantPayload {
+    /// Unit variant.
+    Unit,
+    /// One or more positional tuple fields.
+    Tuple(WholeLogosTupleFields),
+}
+
+/// Positional tuple fields. No stored field names exist.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosTupleFields(Vec<WholeLogosTypeReference>);
+
+impl WholeLogosTupleFields {
+    /// Construct a non-empty tuple payload.
+    pub fn new(fields: Vec<WholeLogosTypeReference>) -> Result<Self, EmptyWholeLogosTupleFields> {
+        if fields.is_empty() {
+            Err(EmptyWholeLogosTupleFields)
+        } else {
+            Ok(Self(fields))
+        }
+    }
+
+    /// Positional payload fields.
+    pub fn fields(&self) -> &[WholeLogosTypeReference] {
+        &self.0
+    }
+}
+
+/// A tuple-payload construction attempted to encode no fields.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+#[error("tuple variant payload requires at least one positional field")]
+pub struct EmptyWholeLogosTupleFields;
 
 /// Visibility admitted by the attribute-free newtype slice.
 ///
@@ -188,11 +379,17 @@ impl WholeLogosContentIdentity {
 
 /// Which encoded-ID position failed validation while loading an archive.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum NewtypeEncodedIdPosition {
-    /// The declaration identity.
-    Name,
-    /// The wrapped type reference.
-    Wrapped,
+pub enum WholeLogosEncodedIdPosition {
+    /// Item declaration.
+    ItemName,
+    /// Newtype field reference.
+    NewtypeField,
+    /// Enumeration variant declaration.
+    VariantName,
+    /// Enumeration tuple-field reference.
+    VariantField,
+    /// Unary application head.
+    ApplicationHead,
 }
 
 /// A typed failure while hashing or restoring whole-Logos content.
@@ -209,6 +406,17 @@ pub enum WholeLogosArchiveError {
         /// Ordered item index.
         item_index: usize,
         /// Positional encoded-ID role.
-        position: NewtypeEncodedIdPosition,
+        position: WholeLogosEncodedIdPosition,
+    },
+
+    /// A name position belongs to language-owned rather than shared vocabulary.
+    #[error("whole-Logos item {item_index} uses non-Universal root {root:?} at {position:?}")]
+    NonUniversalEncodedId {
+        /// Ordered item index.
+        item_index: usize,
+        /// Positional encoded-ID role.
+        position: WholeLogosEncodedIdPosition,
+        /// Unexpected vocabulary root.
+        root: VocabularyRoot,
     },
 }

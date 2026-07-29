@@ -7,17 +7,18 @@ those grades explicit so legacy coverage is not mistaken for production law.
 
 ## Production carrier: positional and full-chain
 
-The conforming carrier is `WholeLogos`. Its current closed item set is exactly
-one attribute-free, non-generic tuple newtype. It stores item visibility,
-declaration identity, wrapped-field visibility, and referenced-type identity
-positionally. Both identities are complete root-fronted
-`VocabularyEncodedId` chains.
+The conforming carrier is `WholeLogos`. Its current closed fixture item set
+contains attribute-free tuple newtypes and attribute-free, non-generic
+enumerations with unit or positional tuple variants. Type references are
+either one complete identity or a recursive unary application. Every item,
+variant, application head, and reference identity is a complete root-fronted
+`VocabularyEncodedId` chain.
 
 Fields have no names in encoded data. Deterministic Rust field naming belongs
 to textual conversion and remains undesigned. The production carrier does not
-admit attributes, generics, structs, enums, aliases, functions, impl blocks,
-uses, constants, modules, or expression bodies. Their presence in the legacy
-graph does not widen this slice.
+admit attributes, generics, named-field structs or variants, aliases,
+functions, impl blocks, uses, constants, modules, or expression bodies. Their
+presence in the legacy graph does not widen this slice.
 
 ## Text and string boundaries
 
@@ -51,16 +52,20 @@ claim.
 
 ## Ordered whole-Logos content
 
-`WholeLogos` is the smallest honest ordered carrier for the first vertical
-slice. Its `Vec<WholeLogosItem>` preserves semantic item order. Its closed item
-set contains only an attribute-free, non-generic tuple newtype, represented as
-four positional values: item visibility, declaration encodedID, wrapped-field
-visibility, and referenced-type encodedID.
+`WholeLogos` is the smallest honest ordered carrier for the current vertical
+fixture slice. Its `Vec<WholeLogosItem>` preserves semantic item order. A
+newtype is represented as four positional values: item visibility, declaration
+encodedID, wrapped-field visibility, and typed reference. An enumeration
+carries item visibility, declaration encodedID, and ordered variants. A variant
+carries its declaration encodedID and either unit or non-empty positional tuple
+payload. A unary type application carries a head encodedID and one recursively
+typed reference.
 
 Both name positions use
-`signal_sema_translator::VocabularyEncodedId`, preserving the complete
-root-fronted module chain opaquely. The carrier does not resolve, shorten,
-flatten, or reallocate those chains. `WholeLogosVisibility` deliberately admits
+`signal_sema_translator::VocabularyEncodedId`, preserving each complete
+root-fronted module chain opaquely. Archive restoration validates every nested
+position as non-empty Universal vocabulary. The carrier does not resolve,
+shorten, flatten, or reallocate those chains. `WholeLogosVisibility` deliberately admits
 only `Public` and `Private`; broader visibility does not enter this carrier
 through the legacy flat-identifier path.
 
