@@ -1,50 +1,36 @@
 # core-logos architecture
 
-`core-logos` is slice three of the psyche-authorized language-family proof of
-concept: the stringless encoded-form algebra of Logos, the Rust-equivalent data
-language.
-This document records the durable direction — the rulings the crate embodies and
-the boundaries it holds — for an agent entering the repository.
+`core-logos` contains two implementation grades: the narrow full-chain
+`WholeLogos` carrier used by the first production slice, and a broader legacy
+`EncodedItem` graph retained as implementation evidence. This document keeps
+those grades explicit so legacy coverage is not mistaken for production law.
 
-## The one ruling that shapes everything: 1-to-1 with Rust in encoded form
+## Production carrier: positional and full-chain
 
-Logos is 1-to-1 with Rust in its encoded form. Every token of Rust meaning is
-stored data in the closed `EncodedItem` algebra; nothing is materialized at
-projection. The legacy algebra has no concrete whole-Logos encoded carrier; the
-first vertical slice adds a deliberately separate, smaller carrier described
-below. Concretely:
+The conforming carrier is `WholeLogos`. Its current closed item set is exactly
+one attribute-free, non-generic tuple newtype. It stores item visibility,
+declaration identity, wrapped-field visibility, and referenced-type identity
+positionally. Both identities are complete root-fronted
+`VocabularyEncodedId` chains.
 
-- The field **name is always present** as a stored `Identifier`. Text elision (a
-  field name dropped when it equals the snake_case of its type) is a text
-  projection concern that never reaches this crate.
-- **Visibility is stored data** — a variant on the general item and field nodes,
-  carried verbatim (a `pub(crate)` field stores `Crate`). It is never a minted
-  specialized type and never computed from a reference graph at projection.
-  `Visibility::Private` is a value whose Rust projection is the empty token stream,
-  so the "is there a `pub`?" special case dissolves into a normal node.
-- **Both derive groups, and the `cfg_attr` and tool attributes, are ordered
-  attribute data** — never computed at projection. The three-attribute golden
-  preamble (`#[rustfmt::skip]`, the feature-gated NOTA derive group, the plain
-  rkyv derive group) is simply three entries in an ordered `Vec<Attribute>`.
+Fields have no names in encoded data. Deterministic Rust field naming belongs
+to textual conversion and remains undesigned. The production carrier does not
+admit attributes, generics, structs, enums, aliases, functions, impl blocks,
+uses, constants, modules, or expression bodies. Their presence in the legacy
+graph does not widen this slice.
 
-## The text-free boundary
+## Text and string boundaries
 
 This crate depends on no `syn`, `prettyplease`, `quote`, or proc-macro machinery.
-The encoded form never depends on text. The TextualRust codec — `syn` decode and
-`prettyplease` encode against the schema-rust goldens — is a **later sibling
-crate**. It reads and writes individual `EncodedItem` values through their typed
-nodes; it does not consume a whole-Logos carrier, and it does not live here.
-Keeping the encoded form text-free is what lets the same encoded value be viewed
-through many textual forms (TextualLogos, TextualRust, and future emission
-languages) without any of them reaching into the encoded form.
+That crate-local dependency boundary does not make every stored graph
+stringless: legacy `Expression::StringLiteral` carries an owned `String`, and
+legacy identifiers are flat `name_table::Identifier` values. The full-chain
+`WholeLogos` path carries neither.
 
-Stringlessness is total: every legacy identifier is a
-`name_table::Identifier`, while the first-slice whole carrier uses complete
-`VocabularyEncodedId` chains. Paths are identity vectors (dotted in any text
-form; `::` materializes only at Rust projection). There is no `Opaque` raw-text
-attribute variant — it is unused by the acceptance oracle and would carry raw
-token text, breaking the text-free boundary; if a genuinely opaque foreign
-attribute is ever needed, it belongs with the TextualRust sibling, not here.
+Production Rust conversion belongs to the structural `rust-logos` textual-form
+path and does not use `syn`, `quote`, or `prettyplease`. The existing
+`textual-rust` sibling and its parser/printer are legacy evidence, not the
+production path.
 
 ## Capsule carrier boundary
 
@@ -93,7 +79,7 @@ whether a Capsule identity is minted or derived, remain unwired. The existing
 per-item hashes remain implementation evidence; recursive per-item content
 hashing is undiscussed, neither rejected nor approved.
 
-## Content identity
+## Legacy per-item content identity
 
 `EncodedItem::content_identity` is `ContentHash::of_core` under
 `EncodedLogosDomain`, a `Contextual` hash domain tagged with `LayoutVersion(7)`.
@@ -101,8 +87,10 @@ The pre-image is the value's canonical portable-archive bytes; the NameTable is
 excluded (it is not part of an encoded value). Two invariants follow and are
 tested:
 
-- **Rename is hash-stable.** The encoded value carries the identifier, never the
-  string, so changing what a name projects to does not move the identity.
+- **Legacy spelling edits are hash-stable.** The encoded value carries the flat
+  identifier, not its NameTable spelling, so changing that spelling does not
+  move the value's hash. This is not evidence for operational rename or
+  full-chain continuity.
 - **A structural edit moves the identity.** Changing a wrapped type, a visibility,
   or attribute order changes the encoded value and therefore its hash.
 
@@ -115,18 +103,18 @@ in the Logos home slice. The composition test proves this existing behavior. It
 does not prove the approved nested module-owned encodedID-chain model; that
 migration remains coordinated downstream work.
 
-## Scope: which item kinds this encoded form carries, and why
+## Legacy EncodedItem evidence
 
-The accepted Rust-lowering ontology (`reports/logos/logos-rust-lowering-v1.md`)
-names seven item kinds: `Newtype`, `Struct`, `Enumeration`, `Alias`,
-`TraitDefinition`, `ImplBlock`, `FreeMethod`. This crate carries the
-**wire-contract data subset** — `Newtype`, `Struct`, `Enumeration`, `Alias`, plus
-the leaf vocabulary (attributes, visibility, paths, generics by kind) — **and
-`ImplBlock` and `Function`** (the ontology's `FreeMethod`, modeled as one node that
-serves both an impl member and a free function), **`Use`** (the `use`-import
-shape at the head of every generated module), and — from the layout-3 kernel
-extension — **`Const` and `Module`** (a const declaration and a const-carrying
-inline module, the class-C stub items the signal goldens emit).
+Everything in this section is the nonconforming legacy graph. It is useful
+archive, lowering, and projection evidence, but it is not production support.
+
+The current `EncodedItem` enum has nine variants: `Newtype`, `Struct`,
+`Enumeration`, `Alias`, `ImplBlock`, `Function`, `Use`, `Const`, and `Module`.
+It also carries a broad leaf vocabulary for attributes, visibility, flat
+identifier paths, generics, fields, variants, types, statements, patterns, and
+expressions. `TraitDefinition` is absent. The historical item-schema
+ratification has an unrecovered “otherwise” exception, so this inventory is a
+statement of implemented code only.
 
 An `ImplBlock`'s members are the ordered heterogeneous `ImplItem` set — a `Method`,
 an `AssociatedType` (`type Err = NotaDecodeError;`), or an `AssociatedConst`
@@ -176,9 +164,8 @@ expression-statements ahead of their tail. The `let` mutability is a closed
 [`LetBinding`] kind, not a boolean. The whole vocabulary is closed and dispatches on
 node kind, never on a head string.
 
-`TraitDefinition` as a top-level item remains **left out**: a trait declaration's
-default bodies and member declarations are a separate growth. (Associated types and
-consts are now modeled **inside impl blocks**, where the goldens carry them.)
+`TraitDefinition` as a top-level item is absent. Associated types and consts are
+modeled only **inside legacy impl blocks**, where the goldens carry them.
 Struct-literal construction (`Self { … }`), named field access, and early `return`
 remain the honest frontier beyond the modeled statement vocabulary — the codec bodies
 are written in a style that dissolves them (an `.ok_or(…)?` in place of an
@@ -194,60 +181,18 @@ this item have a name?" question dissolves into a normal `None` rather than a
 fabricated identifier, and an impl block has no visibility, so `with_visibility`
 returns it unchanged.
 
-## Named revisable leans (Tier-1 vocabulary boundary)
+## Legacy vocabulary boundaries
 
-Every choice below the psyche rulings is a revisable lean with a stated trigger:
+The legacy graph records witnessed implementation choices, not a future design:
+`Expression::StringLiteral(String)` is string-bearing; integer literals use
+typed value-plus-representation data; receivers omit `&mut self`; field access
+is tuple-indexed in the modeled bodies; `Use` admits only its brace-group form;
+`ConfigurationPredicate` currently admits only `Feature`; and inline `Module`
+was built for const members. Function and local-name identity, the
+string-literal remedy, and any widening of these shapes remain outside this
+document.
 
-- **The Tier-1 body vocabulary boundary** is drawn at the class-A-and-kin shapes
-  above. *Trigger:* a witnessed wire body needs a shape outside it (a statement, a
-  struct literal, a binary operator, a closure) — extend the vocabulary then, not
-  speculatively.
-- **String-literal content is stored data, not an interned name.** A name is
-  interned and excluded from content identity (rename-stable); a string literal's
-  content is semantic and is hashed as part of the value, so `Expression::StringLiteral`
-  carries a `String`. This is the one place an encoded value holds owned text, and it is
-  literal-value data, not the raw-token-text escape hatch the text-free boundary
-  forbids. *Trigger:* if a projection ever needs to intern literal content, revisit.
-- **Reference mutability is modeled; `&mut self` is not.** The layout-3 growth added
-  `&mut` to `ReferenceType` (a stored `ReferenceMutability` kind) because the
-  witnessed `Display::fmt` signature borrows the formatter mutably
-  (`&mut std::fmt::Formatter<'_>`) — the trigger fired. The `Receiver` still models
-  only `self`/`&self`; a `&mut self` receiver stays unwitnessed. *Trigger:* a
-  witnessed Tier-1 body takes `&mut self`.
-- **Integer literals are value-plus-representation, never stored text.** An
-  `IntegerLiteral` carries a `u128` value and a closed `IntegerRepresentation`
-  (`Decimal`, or `Hexadecimal { minimum_digits }` for the zero-padded `0x…` form),
-  so `0x0001000000000000` round-trips byte-exact without the encoded form holding raw token
-  text — the stringless boundary holds and the string-literal exception below stays
-  the *only* owned-text field. The hexadecimal form is **lowercase** (the goldens'
-  digits are `0`/`1`, case-agnostic). *Trigger:* a witnessed literal needs uppercase
-  hex, a digit separator, a suffix, or a non-decimal/non-hex radix.
-- **Const modules carry consts only.** `Module` models the witnessed `short_header`
-  shape — an inline module whose members are `Const`s. A module carrying an enum,
-  impl, or other item is a broader growth point (it re-exposes the derive-group
-  trailing-comma layout that a context-free `DeriveGroup` does not yet carry
-  faithfully). *Trigger:* a witnessed module needs a non-const member — model it
-  together with a trailing-comma-faithful `DeriveGroup` then.
-- **Slice and lifetime types, in position.** `TypeReference::Slice` (`[&'static str]`)
-  and `TypeReference::Lifetime` (the `'_` of `Formatter<'_>`) join `Reference` and
-  `ImplTrait` as the signature/const-type and generic-argument shapes — legitimate
-  by position, never in wire-data field position. *Trigger:* a witnessed shape needs
-  another positioned type kind.
-- **Tuple-index field access only.** Named field access (`self.origin_route`) is
-  unwitnessed in a fully-Tier-1 body (the impls that use it carry class-B struct
-  literals and are rejected whole). *Trigger:* a fully-Tier-1 body accesses a named
-  field.
-- **Use imports are the brace-group form only.** `Use` models `use <base>::{<group>};`
-  — the one shape the wire goldens exercise (the NOTA import). A bare import
-  (`use foo::Bar;`), a glob (`use foo::*;`), and an aliased import (`use foo::Bar as
-  Baz;`) are unwitnessed growth points the closed shape does not carry. *Trigger:* a
-  witnessed generated module needs one of those import shapes.
-- **The cfg gate is a `Feature` predicate.** `Attribute::Cfg` reuses
-  `ConfigurationPredicate`, whose sole variant is `Feature(Identifier)` — the only
-  gate the goldens exercise (`#[cfg(feature = "nota-text")]`). *Trigger:* a witnessed
-  gate needs `all`/`any`/`not` or a non-feature key.
-
-## Content identity and layout version across this growth
+## Legacy content identity and layout history
 
 **The current layout is 7.** The historical record below begins with the
 layout-2 correction. An earlier version of this document claimed that adding item
@@ -338,10 +283,11 @@ data, with no change to this vocabulary.
 **The layout is now 4.** The newtype form gained tuple-field visibility: `Newtype`
 carries a `wrapped_visibility: Visibility` between `name` and `wrapped`, so the
 single tuple field of a `pub`-field tuple struct (`TraceEvent(pub ObjectName)`) is
-stored data exactly as visibility is at the item level and the named-field level.
+stored data exactly as visibility is on the legacy item and `Field` nodes.
 This closes the last class-D gap — the trace goldens declare
 `pub struct TraceEvent(pub ObjectName);`, whose `pub` field the layout-3 `Newtype`
-could not model, so the declaration was not byte-exact-projectable. `Private`
+could not model, so the declaration was not byte-exact-projectable. This is a
+legacy `Newtype` archive-layout fact, not a named-field production rule. `Private`
 projects to the empty token stream, so a bare newtype (`CommitSequence(Integer)`)
 stores `Private` and projects unchanged — the "no `pub` on the field" special case
 dissolves into the normal case. rkyv archives a struct as the concatenation of its
@@ -381,9 +327,8 @@ cache authority stay separate: the lock file carries the revisions, and
 
 ## Layout
 
-One concern per file under `src/`: the closed `item` algebra and its content
-identity; one file per leaf family (`attribute`, `type_reference`, `generics`,
-`path`, `visibility`, `field`); one file per item kind (`newtype`, `structure`,
-`enumeration`, `alias`); the `domain` marker and the crate `error`. Tests live
-under `tests/`, one file per behavior, with the golden-pair fixtures in
-`tests/support`.
+`src/whole.rs` owns the narrow full-chain production carrier. The remaining
+files implement the legacy graph: the closed `item` algebra, its content
+identity, leaf families, and item implementations for newtype, structure,
+enumeration, alias, impl block, function, use, const, and module. Tests live
+under `tests/`.

@@ -1,59 +1,55 @@
 # core-logos
 
-The stringless encoded-form algebra of Logos — the Rust-equivalent data language,
-1-to-1 with Rust in encoded form.
+The Logos encoded-form crate. It currently contains a conforming, deliberately
+narrow full-chain carrier and a broader legacy flat-identifier graph.
 
-Logos models a standardized Rust subset as exploded, non-sugared, strictly-typed
-positional data. `core-logos` is the encoded-form layer of that model: a closed
-`EncodedItem` algebra over a shared stringless leaf vocabulary. It is **text-free** by
-design — it depends on no `syn`, `prettyplease`, `quote`, or proc-macro machinery.
-Rendering Logos to and from Rust text is the job of a later sibling crate,
-`TextualRust`; the encoded form never depends on text.
+`WholeLogos` is the production precedent: ordered positional data with complete
+translator-issued encodedID chains and no field names. `EncodedItem` is retained
+legacy evidence. The crate itself depends on no `syn`, `prettyplease`, `quote`,
+or proc-macro machinery, but that does not make every legacy value string-free:
+`Expression::StringLiteral` carries an owned `String`.
 
-## What "stringless" and "1-to-1 in encoded form" mean here
+## The production carrier
 
-- Every legacy item identifier is a `name_table::Identifier` into a NameTable;
-  the separate first-slice whole carrier uses complete
-  `VocabularyEncodedId` chains. Paths are identity vectors. The `::` separator,
-  the `<>` of a generic application, the `pub` keyword, and snake_case field
-  names are all *projection* concerns that materialize far from this crate.
-- Every token of Rust meaning is stored data. Visibility is a stored variant on
-  the general item and field nodes (never a minted `PublicStruct`/`PrivateStruct`
-  type). Both derive groups and the `cfg_attr` and tool attributes are ordered
-  attribute data — never computed at projection.
-- Generics lower by kind, never by a string name.
+`WholeLogos` admits one item shape: an attribute-free, non-generic tuple
+newtype. Its four positional values are item visibility, declaration encodedID,
+wrapped-field visibility, and referenced-type encodedID. Both identities are
+complete `VocabularyEncodedId` chains. The carrier does not resolve, flatten,
+shorten, or allocate them.
 
-## The algebra
+Fields have no stored names. Deterministic names for Rust text remain a
+textual-form concern and are not designed here. Attributes, generics, structs,
+enums, aliases, functions, impl blocks, uses, constants, modules, and expression
+bodies are outside this carrier's current support.
 
-`EncodedItem` is a closed enum — exhaustively matched, no wildcard arms — over four
-data-shape item kinds and a shared leaf vocabulary:
+## Legacy EncodedItem evidence
 
-- Items: `Newtype`, `Struct`, `Enumeration`, `Alias`.
-- Leaves: `Visibility`, `Attribute` (`Derive` / `Configuration` / `ToolPath` /
-  `HelperDerive`), `TypeReference` / `TypeApplication`, `PathNode`, `Field`,
-  `Variant` / `VariantPayload`, `Generics` / `GenericParameter`, and the
-  `name_table::Identifier` leaf.
+`EncodedItem` is a separate nonconforming graph over flat
+`name_table::Identifier` values, stored field-name identifiers, NameTable
+composition, and a string-bearing literal variant. Its current item variants
+are `Newtype`, `Struct`, `Enumeration`, `Alias`, `ImplBlock`, `Function`, `Use`,
+`Const`, and `Module`. `TraitDefinition` is absent.
 
-The trait, impl, and free-method item kinds of the full Rust-lowering ontology are
-deliberately out of scope for this text-free encoded form — see `ARCHITECTURE.md`.
+That broad inventory is regression and migration evidence, not production
+coverage. See `ARCHITECTURE.md` for its exact implemented boundaries and archive
+history.
 
-## Content identity
+## Legacy per-item content identity
 
 `EncodedItem::content_identity` hashes a value over its canonical portable-archive
 bytes under a layout-versioned `EncodedLogosDomain`, with the NameTable excluded from
-the pre-image. So a rename is hash-stable by construction, and a structural edit
-moves the identity. A Logos NameTable owns the Logos namespace and composes completed schema
-slices without copying, flattening, or renumbering their identifiers.
+the pre-image. A legacy spelling edit therefore leaves the flat-identifier value's
+hash unchanged, while a structural edit moves it. This is not proof of the
+approved nested module-owned authority or its operational rename.
 
 ## Capsule carrier
 
 `capsule_from_issued_hash` is the kind-fixed whole-Logos pass-through into
 `protos::Capsule<protos::Logos, Pin>`. The caller supplies both the
-`ContentAddressedHash` and opaque complete NameTree pin. `core-logos` has no
-whole-Logos encoded carrier and does not invent one here: it does not derive a
-Capsule hash from `EncodedItem` values, verify content correspondence, inspect or
-compose the pin, or claim that its current flat identifiers implement nested
-encodedID chains.
+`ContentAddressedHash` and opaque complete NameTree pin. This helper neither
+constructs nor validates `WholeLogos`: it does not derive a Capsule hash from
+either carrier, verify content correspondence, inspect or compose the pin, or
+claim that legacy flat identifiers implement nested encodedID chains.
 
 `EncodedItem::content_identity` remains the established per-item API and archive
 lock. The Capsule pass-through does not reinterpret or replace it.
@@ -79,13 +75,6 @@ nix flake check      # build, test, clippy, fmt, doc — the gate
 cargo test           # inner-loop tests
 ```
 
-Published as `0.4.0`. The Capsule and whole-content surfaces consume
-`content-identity@f1f9c6efc828acaefd0f751550cd40389d312bf5` under the dependency
-name `capsule-content-identity`,
-`name-table@1f558eac44bd03034e51ad98e3a65ec16d8b8411` under
-`encoded-name-table`,
-`signal-sema-translator@8ff7d0db033c756a0cd7999e72e564ca1c32b4aa`, and
-`protos@1435c9aeb7f24e811aca670101e355ff26818ae2`. The legacy per-item/archive
-identity and flat name-table graph remain pinned to their existing revisions,
-with `core-ethos@b9db643a853b1f52f10a4100a791d5dbc8c7240d` as the current
-producer dev-dependency.
+Published as `0.4.0`. Exact producer revisions live in `Cargo.toml` and
+`Cargo.lock`; the manifest deliberately keeps the full-chain and legacy
+dependency worlds distinct.
