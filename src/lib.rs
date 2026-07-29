@@ -30,6 +30,7 @@ pub mod function;
 pub mod generics;
 pub mod impl_block;
 pub mod item;
+pub mod language;
 pub mod module;
 pub mod newtype;
 pub mod path;
@@ -60,6 +61,9 @@ pub use function::{Block, Function, LetBinding, LetStatement, Parameter, Receive
 pub use generics::{GenericParameter, Generics, LifetimeParameter, TypeParameter};
 pub use impl_block::{AssociatedType, ImplBlock, ImplItem};
 pub use item::EncodedItem;
+pub use language::{
+    LogosLanguage, LogosLanguageError, LogosLanguageTypeIds, LogosLanguageWords, LogosRule,
+};
 pub use module::Module;
 pub use newtype::Newtype;
 pub use path::PathNode;
