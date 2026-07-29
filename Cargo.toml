@@ -1,6 +1,6 @@
 [package]
 name         = "core-logos"
-version      = "0.13.0"
+version      = "0.14.0"
 edition      = "2024"
 rust-version = "1.85"
 license      = "MIT OR Apache-2.0"
@@ -20,7 +20,7 @@ name-table               = { git = "https://github.com/LiGoldragon/name-table.gi
 protos                   = { git = "https://github.com/LiGoldragon/protos.git", rev = "1343d0c405cdb6929552ea6b12c48739e73f35ab" }
 raw-discovery            = { git = "https://github.com/LiGoldragon/raw-discovery.git", rev = "7290f65bbb5e7825ab2ca58340631d154d69d110" }
 signal-sema-translator   = { git = "https://github.com/LiGoldragon/signal-sema-translator.git", rev = "dd8e7b5656833f640e49c099ab3be6f09881f9c5" }
-structural-codec         = { git = "https://github.com/LiGoldragon/structural-codec.git", rev = "f7a0ff1b63cd54ca5353b1a84476704221041b41" }
+structural-codec         = { git = "https://github.com/LiGoldragon/structural-codec.git", rev = "8bad12d853779d5a2e7988f5ec6a4118ada3cef0" }
 rkyv                     = { version = "0.8", default-features = false, features = ["std", "bytecheck", "little_endian", "pointer_width_32", "unaligned"] }
 thiserror                = "2"
 
