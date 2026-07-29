@@ -18,6 +18,11 @@ use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogos(Vec<WholeLogosItem>);
 
+impl structural_codec::EncodedForm for WholeLogos {
+    type VocabularyRoot = VocabularyRoot;
+    type Language = protos::Logos;
+}
+
 impl WholeLogos {
     /// Construct whole content in semantic item order.
     pub fn new(items: Vec<WholeLogosItem>) -> Self {

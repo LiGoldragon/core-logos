@@ -1,7 +1,7 @@
 # core-logos architecture
 
-`core-logos` contains two implementation grades: the narrow full-chain
-`WholeLogos` carrier used by the first production slice, and a broader legacy
+`core-logos` contains two implementation grades: the full-chain
+`WholeLogos` production carrier, and a broader legacy
 `EncodedItem` graph retained as implementation evidence. This document keeps
 those grades explicit so legacy coverage is not mistaken for production law.
 
@@ -20,7 +20,7 @@ Fields have no names in encoded data. Deterministic Rust field naming belongs
 to textual conversion and remains undesigned. The production carrier does not
 admit attributes, generics, named-field structs or variants, aliases,
 functions, impl blocks, uses, constants, modules, or expression bodies. Their
-presence in the legacy graph does not widen this slice.
+presence in the legacy graph does not widen the production carrier.
 
 ## Text and string boundaries
 
@@ -31,9 +31,9 @@ legacy identifiers are flat `name_table::Identifier` values. The full-chain
 `WholeLogos` path carries neither.
 
 Production Rust conversion belongs to the structural `rust-logos` textual-form
-path and does not use `syn`, `quote`, or `prettyplease`. The existing
-`textual-rust` sibling and its parser/printer are legacy evidence, not the
-production path.
+path and does not use `syn`, `quote`, or `prettyplease`. `core-logos` carries
+one canonical structural-codec 0.8 dependency for the `WholeLogos`
+`EncodedForm` contract and owns no separate textual grammar.
 
 ## Capsule carrier boundary
 
@@ -54,8 +54,8 @@ claim.
 
 ## Ordered whole-Logos content
 
-`WholeLogos` is the smallest honest ordered carrier for the current vertical
-fixture slice. Its `Vec<WholeLogosItem>` preserves semantic item order. A
+`WholeLogos` is the smallest honest ordered production carrier. Its
+`Vec<WholeLogosItem>` preserves semantic item order. A
 newtype is represented as four positional values: item visibility, declaration
 encodedID, wrapped-field visibility, and typed reference. An enumeration
 carries item visibility, declaration encodedID, and ordered variants. A variant

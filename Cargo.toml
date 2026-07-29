@@ -1,6 +1,6 @@
 [package]
 name         = "core-logos"
-version      = "0.6.0"
+version      = "0.7.0"
 edition      = "2024"
 rust-version = "1.85"
 license      = "MIT OR Apache-2.0"
@@ -18,14 +18,10 @@ capsule-content-identity = { package = "content-identity", git = "https://github
 encoded-name-table       = { package = "name-table", git = "https://github.com/LiGoldragon/name-table.git", rev = "50cb4bb53ae2dc4f2516f6912be328ef98ae49f8" }
 name-table               = { git = "https://github.com/LiGoldragon/name-table.git", rev = "196610e2907687dcb8dbd0d2dfaafe4aefd9fa27" }
 protos                   = { git = "https://github.com/LiGoldragon/protos.git", rev = "1343d0c405cdb6929552ea6b12c48739e73f35ab" }
-signal-sema-translator   = { git = "https://github.com/LiGoldragon/signal-sema-translator.git", rev = "8c504ba7aa8dbdc5edf7daadbb862bbdaa5613be" }
+signal-sema-translator   = { git = "https://github.com/LiGoldragon/signal-sema-translator.git", rev = "dd8e7b5656833f640e49c099ab3be6f09881f9c5" }
+structural-codec         = { git = "https://github.com/LiGoldragon/structural-codec.git", rev = "5c11e1fb7f58444cd860207803d8f705e7415d71" }
 rkyv                     = { version = "0.8", default-features = false, features = ["std", "bytecheck", "little_endian", "pointer_width_32", "unaligned"] }
 thiserror                = "2"
-
-[dev-dependencies]
-core-ethos       = { git = "https://github.com/LiGoldragon/core-ethos.git", rev = "a79aeb9a0b2bb304d69d7392147639e13a3d58bc" }
-structural-codec = { git = "https://github.com/LiGoldragon/structural-codec.git", rev = "23497c43f81b619158e5cfbd83a012eb63c4186f" }
-raw-discovery    = { git = "https://github.com/LiGoldragon/raw-discovery.git", rev = "2ac78f621980fa02daa3b31e90cc5c73570eed6e" }
 
 [lints.rust]
 unsafe_code = "forbid"
