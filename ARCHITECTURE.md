@@ -9,8 +9,8 @@ the boundaries it holds — for an agent entering the repository.
 ## The one ruling that shapes everything: 1-to-1 with Rust in encoded form
 
 Logos is 1-to-1 with Rust in its encoded form. Every token of Rust meaning is
-stored data in an `EncodedLogos` value; nothing is materialized at projection.
-Concretely:
+stored data in the closed `EncodedItem` algebra; nothing is materialized at
+projection. There is no concrete whole-Logos encoded carrier. Concretely:
 
 - The field **name is always present** as a stored `Identifier`. Text elision (a
   field name dropped when it equals the snake_case of its type) is a text
@@ -30,10 +30,11 @@ Concretely:
 This crate depends on no `syn`, `prettyplease`, `quote`, or proc-macro machinery.
 The encoded form never depends on text. The TextualRust codec — `syn` decode and
 `prettyplease` encode against the schema-rust goldens — is a **later sibling
-crate**. It reads and writes `EncodedLogos`; it does not live here. Keeping the
-encoded form text-free is what lets the same encoded value be viewed through many
-textual forms (TextualLogos, TextualRust, and future emission languages) without
-any of them reaching into the encoded form.
+crate**. It reads and writes individual `EncodedItem` values through their typed
+nodes; it does not consume a whole-Logos carrier, and it does not live here.
+Keeping the encoded form text-free is what lets the same encoded value be viewed
+through many textual forms (TextualLogos, TextualRust, and future emission
+languages) without any of them reaching into the encoded form.
 
 Stringlessness is total: every identifier is a `name_table::Identifier`; paths are
 segment vectors of identifiers (dotted in any text form; `::` materializes only at
@@ -266,9 +267,9 @@ deliberate constant update rather than a silent hash move.
 
 **Consumers cross a hash boundary at layout 2.** Any consumer advancing its
 `core-logos` pin across `be809429` and later moves from layout-1 hashes to
-layout-2 hashes: every EncodedLogos content identity it computes changes. A host
+layout-2 hashes: every `EncodedItem` content identity it computes changes. A host
 survey at the time of this correction confirmed **no durable store or fixture holds
-persisted EncodedLogos hashes** (everything recomputes, or is tempdir-ephemeral), so
+persisted `EncodedItem` hashes** (everything recomputes, or is tempdir-ephemeral), so
 this correction needs no data migration — but the boundary is real, and a consumer
 must advance across it only via the deliberate cascade slice, never casually.
 
@@ -330,7 +331,7 @@ moved archived bytes and received its own deliberate layout bump.
 ### Layout 7: namespace-variant identifiers
 
 Layout 7 adopts namespace-variant `Identifier` values with `u16` locals and the
-canonical `EncodedLogos` hash context. Every `EncodedItem` stores identifiers, so
+canonical `EncodedItem` hash context. Every `EncodedItem` stores identifiers, so
 replacing the former flat representation changes its archived bytes even when the
 Rust-shaped data is otherwise identical; the renamed context deliberately changes
 the domain preamble as well. The `CommitSequence` absolute witness at layout 7 is
