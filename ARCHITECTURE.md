@@ -42,6 +42,23 @@ the acceptance oracle and would carry raw token text, breaking the text-free
 boundary; if a genuinely opaque foreign attribute is ever needed, it belongs with
 the TextualRust sibling, not here.
 
+## Capsule carrier boundary
+
+`capsule_from_issued_hash` fixes only the outer kind to `protos::Logos`, whose
+stored identity variant is `WholeLogos`. It passes a caller-issued
+`ContentAddressedHash` and caller-supplied opaque complete NameTree pin into
+`protos::Capsule`. It does not create a whole-Logos encoded carrier, collect
+`EncodedItem` values into one, derive or verify a whole-content hash, inspect the
+pin, or compose module tables. Complete-pin verification and the
+module-table-to-Capsule relationship remain unwired.
+
+The existing per-item `EncodedItem::content_identity` API and archive layout are
+unchanged. The new identity producer is dependency-renamed
+`capsule-content-identity`; the original dependency remains the established
+per-item/archive type in the legacy graph. Flat `Identifier` fields and the old
+`NameTable` dependency stay explicit migration debt rather than a chain-migration
+claim.
+
 ## Content identity
 
 `EncodedItem::content_identity` is `ContentHash::of_core` under
@@ -55,12 +72,14 @@ tested:
 - **A structural edit moves the identity.** Changing a wrapped type, a visibility,
   or attribute order changes the encoded value and therefore its hash.
 
-## Composed identifier namespaces
+## Legacy composed identifier namespaces
 
 A Logos NameTable owns the `Logos` namespace and composes completed schema slices.
 Borrowed `Schema` identifiers retain their exact namespace and local allocation;
 they are neither copied, flattened, nor renumbered. New Logos names allocate only
-in the Logos home slice. The composition test proves both properties.
+in the Logos home slice. The composition test proves this existing behavior. It
+does not prove the approved nested module-owned encodedID-chain model; that
+migration remains coordinated downstream work.
 
 ## Scope: which item kinds this encoded form carries, and why
 

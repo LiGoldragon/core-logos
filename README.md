@@ -44,6 +44,19 @@ the pre-image. So a rename is hash-stable by construction, and a structural edit
 moves the identity. A Logos NameTable owns the Logos namespace and composes completed schema
 slices without copying, flattening, or renumbering their identifiers.
 
+## Capsule carrier
+
+`capsule_from_issued_hash` is the kind-fixed whole-Logos pass-through into
+`protos::Capsule<protos::Logos, Pin>`. The caller supplies both the
+`ContentAddressedHash` and opaque complete NameTree pin. `core-logos` has no
+whole-Logos encoded carrier and does not invent one here: it does not derive a
+Capsule hash from `EncodedItem` values, verify content correspondence, inspect or
+compose the pin, or claim that its current flat identifiers implement nested
+encodedID chains.
+
+`EncodedItem::content_identity` remains the established per-item API and archive
+lock. The Capsule pass-through does not reinterpret or replace it.
+
 ## Building
 
 ```
@@ -51,6 +64,10 @@ nix flake check      # build, test, clippy, fmt, doc — the gate
 cargo test           # inner-loop tests
 ```
 
-Published as `0.2.0`. Consumes `content-identity` and `name-table` as pinned git
-dependencies (`core-ethos` is a dev-dependency, for the NameTable-continuity
-test).
+Published as `0.3.0`. The Capsule surface consumes
+`content-identity@f1f9c6efc828acaefd0f751550cd40389d312bf5` under the dependency
+name `capsule-content-identity` and
+`protos@1435c9aeb7f24e811aca670101e355ff26818ae2`. The legacy per-item/archive
+identity and flat name-table graph remain pinned to their existing revisions,
+with `core-ethos@b9db643a853b1f52f10a4100a791d5dbc8c7240d` as the current
+producer dev-dependency.

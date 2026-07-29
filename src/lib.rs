@@ -17,6 +17,7 @@
 
 pub mod alias;
 pub mod attribute;
+pub mod capsule;
 pub mod const_item;
 pub mod domain;
 pub mod enumeration;
@@ -40,6 +41,7 @@ pub use alias::Alias;
 pub use attribute::{
     Attribute, ConfigurationAttribute, ConfigurationPredicate, DeriveGroup, HelperDerive,
 };
+pub use capsule::capsule_from_issued_hash;
 pub use const_item::Const;
 pub use domain::EncodedLogosDomain;
 pub use enumeration::{Enumeration, Variant, VariantPayload};
