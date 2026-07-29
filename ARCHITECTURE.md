@@ -10,7 +10,9 @@ the boundaries it holds — for an agent entering the repository.
 
 Logos is 1-to-1 with Rust in its encoded form. Every token of Rust meaning is
 stored data in the closed `EncodedItem` algebra; nothing is materialized at
-projection. There is no concrete whole-Logos encoded carrier. Concretely:
+projection. The legacy algebra has no concrete whole-Logos encoded carrier; the
+first vertical slice adds a deliberately separate, smaller carrier described
+below. Concretely:
 
 - The field **name is always present** as a stored `Identifier`. Text elision (a
   field name dropped when it equals the snake_case of its type) is a text
@@ -36,12 +38,13 @@ Keeping the encoded form text-free is what lets the same encoded value be viewed
 through many textual forms (TextualLogos, TextualRust, and future emission
 languages) without any of them reaching into the encoded form.
 
-Stringlessness is total: every identifier is a `name_table::Identifier`; paths are
-segment vectors of identifiers (dotted in any text form; `::` materializes only at
-Rust projection). There is no `Opaque` raw-text attribute variant — it is unused by
-the acceptance oracle and would carry raw token text, breaking the text-free
-boundary; if a genuinely opaque foreign attribute is ever needed, it belongs with
-the TextualRust sibling, not here.
+Stringlessness is total: every legacy identifier is a
+`name_table::Identifier`, while the first-slice whole carrier uses complete
+`VocabularyEncodedId` chains. Paths are identity vectors (dotted in any text
+form; `::` materializes only at Rust projection). There is no `Opaque` raw-text
+attribute variant — it is unused by the acceptance oracle and would carry raw
+token text, breaking the text-free boundary; if a genuinely opaque foreign
+attribute is ever needed, it belongs with the TextualRust sibling, not here.
 
 ## Capsule carrier boundary
 
@@ -59,6 +62,36 @@ unchanged. The new identity producer is dependency-renamed
 per-item/archive type in the legacy graph. Flat `Identifier` fields and the old
 `NameTable` dependency stay explicit migration debt rather than a chain-migration
 claim.
+
+## Ordered whole-Logos content
+
+`WholeLogos` is the smallest honest ordered carrier for the first vertical
+slice. Its `Vec<WholeLogosItem>` preserves semantic item order. Its closed item
+set contains only an attribute-free, non-generic tuple newtype, represented as
+four positional values: item visibility, declaration encodedID, wrapped-field
+visibility, and referenced-type encodedID.
+
+Both name positions use
+`signal_sema_translator::VocabularyEncodedId`, preserving the complete
+root-fronted module chain opaquely. The carrier does not resolve, shorten,
+flatten, or reallocate those chains. `WholeLogosVisibility` deliberately admits
+only `Public` and `Private`; broader visibility does not enter this carrier
+through the legacy flat-identifier path.
+
+`WholeLogos::content_identity` archives the complete ordered carrier
+canonically, hashes those bytes without a whole-content
+kind/domain/layout discriminator in the hash input, and then wraps the result
+in the local
+`WholeLogosContentIdentity::WholeLogos` variant. Item mutation and semantic
+reordering therefore move the whole identity.
+
+This local identity is not a Capsule identity. No complete NameTree pin is
+available here, so this crate neither constructs
+`content_identity::CapsuleIdentity` nor passes the derived hash into
+`protos::Capsule`. How module-table snapshots compose into the complete pin, and
+whether a Capsule identity is minted or derived, remain unwired. The existing
+per-item hashes remain implementation evidence; recursive per-item content
+hashing is undiscussed, neither rejected nor approved.
 
 ## Content identity
 

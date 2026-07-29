@@ -3,9 +3,11 @@
 //! The stringless encoded-form algebra of Logos — the Rust-equivalent data language,
 //! 1-to-1 with Rust. This crate is **text-free**: it depends on no
 //! `syn`, `prettyplease`, `quote`, or proc-macro machinery. Every identifier is an
-//! [`name_table::Identifier`] into a NameTable; paths are segment vectors of
-//! identifiers. The `::`, the `<>`, the `pub` keyword, and snake_case field names
-//! are all projection concerns that materialize far from this crate, in the later
+//! [`name_table::Identifier`] into a legacy NameTable; the first-slice
+//! [`WholeLogos`] carrier instead preserves complete production
+//! [`signal_sema_translator::VocabularyEncodedId`] chains. Paths are identity
+//! vectors. The `::`, the `<>`, the `pub` keyword, and snake_case field names are
+//! all projection concerns that materialize far from this crate, in the later
 //! `TextualRust` sibling codec.
 //!
 //! The centerpiece is [`EncodedItem`], a closed enum over a shared stringless leaf
@@ -36,6 +38,7 @@ pub mod structure;
 pub mod type_reference;
 pub mod use_import;
 pub mod visibility;
+pub mod whole;
 
 pub use alias::Alias;
 pub use attribute::{
@@ -68,3 +71,7 @@ pub use type_reference::{
 };
 pub use use_import::Use;
 pub use visibility::Visibility;
+pub use whole::{
+    NewtypeEncodedIdPosition, WholeLogos, WholeLogosArchiveError, WholeLogosContentIdentity,
+    WholeLogosItem, WholeLogosNewtype, WholeLogosVisibility,
+};
