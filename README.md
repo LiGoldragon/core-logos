@@ -11,7 +11,7 @@ attribute-free, non-generic enumerations with unit or positional tuple
 variants. Type references retain either one complete chain or a recursive unary
 application.
 
-`WholeLogos` implements the canonical structural-codec 0.10 `EncodedForm`
+`WholeLogos` implements the canonical structural-codec 0.11 `EncodedForm`
 contract. The crate carries one structural-codec dependency and no private
 textual grammar; Rust text conversion belongs to the sibling structural
 textual-form component.
