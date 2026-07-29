@@ -107,7 +107,7 @@ dependencies = [
 
 [[package]]
 name = "core-logos"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "content-identity 0.3.0",
  "content-identity 0.4.0",
@@ -422,8 +422,8 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "structural-codec"
-version = "0.15.0"
-source = "git+https://github.com/LiGoldragon/structural-codec.git?rev=8bad12d853779d5a2e7988f5ec6a4118ada3cef0#8bad12d853779d5a2e7988f5ec6a4118ada3cef0"
+version = "0.16.0"
+source = "git+https://github.com/LiGoldragon/structural-codec.git?rev=fc1b23b4a66a7d3ca7c3c367830ee6ca31193f48#fc1b23b4a66a7d3ca7c3c367830ee6ca31193f48"
 dependencies = [
  "content-identity 0.3.0",
  "name-table 0.3.0",
