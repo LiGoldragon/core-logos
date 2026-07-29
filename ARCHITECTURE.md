@@ -120,7 +120,7 @@ The current `EncodedItem` enum has nine variants: `Newtype`, `Struct`,
 `Enumeration`, `Alias`, `ImplBlock`, `Function`, `Use`, `Const`, and `Module`.
 It also carries a broad leaf vocabulary for attributes, visibility, flat
 identifier paths, generics, fields, variants, types, statements, patterns, and
-expressions. `TraitDefinition` is absent. The historical item-schema
+expressions. `TraitDefinition` is absent. The historical item-ethos
 ratification has an unrecovered “otherwise” exception, so this inventory is a
 statement of implemented code only.
 
