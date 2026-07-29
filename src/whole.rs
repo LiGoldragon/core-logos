@@ -71,7 +71,7 @@ impl WholeLogos {
         for (item_index, item) in self.0.iter().enumerate() {
             match item {
                 WholeLogosItem::Newtype(newtype) => {
-                    validate_universal(
+                    validate_universal_declaration(
                         item_index,
                         WholeLogosEncodedIdPosition::ItemName,
                         newtype.name(),
@@ -83,13 +83,13 @@ impl WholeLogos {
                     )?;
                 }
                 WholeLogosItem::Enumeration(enumeration) => {
-                    validate_universal(
+                    validate_universal_declaration(
                         item_index,
                         WholeLogosEncodedIdPosition::ItemName,
                         enumeration.name(),
                     )?;
                     for variant in enumeration.variants() {
-                        validate_universal(
+                        validate_universal_declaration(
                             item_index,
                             WholeLogosEncodedIdPosition::VariantName,
                             variant.name(),
@@ -111,7 +111,7 @@ impl WholeLogos {
     }
 }
 
-fn validate_universal(
+fn validate_universal_declaration(
     item_index: usize,
     position: WholeLogosEncodedIdPosition,
     encoded_id: &VocabularyEncodedId,
@@ -139,10 +139,10 @@ fn validate_reference(
 ) -> Result<(), WholeLogosArchiveError> {
     match reference {
         WholeLogosTypeReference::Identity(encoded_id) => {
-            validate_universal(item_index, position, encoded_id)
+            validate_reference_encoded_id(item_index, position, encoded_id)
         }
         WholeLogosTypeReference::Application(application) => {
-            validate_universal(
+            validate_reference_encoded_id(
                 item_index,
                 WholeLogosEncodedIdPosition::ApplicationHead,
                 application.head(),
@@ -150,6 +150,20 @@ fn validate_reference(
             validate_reference(item_index, position, application.payload())
         }
     }
+}
+
+fn validate_reference_encoded_id(
+    item_index: usize,
+    position: WholeLogosEncodedIdPosition,
+    encoded_id: &VocabularyEncodedId,
+) -> Result<(), WholeLogosArchiveError> {
+    if encoded_id.chain().is_empty() {
+        return Err(WholeLogosArchiveError::EmptyEncodedId {
+            item_index,
+            position,
+        });
+    }
+    Ok(())
 }
 
 /// The closed item vocabulary admitted by [`WholeLogos`] in the first slice.
@@ -210,7 +224,7 @@ impl WholeLogosNewtype {
 /// Positional type reference carried by Whole Logos.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub enum WholeLogosTypeReference {
-    /// One complete Universal encoded-ID chain.
+    /// One complete Universal or language-vocabulary encoded-ID chain.
     Identity(VocabularyEncodedId),
     /// One unary application.
     Application(WholeLogosTypeApplication),
@@ -409,8 +423,8 @@ pub enum WholeLogosArchiveError {
         position: WholeLogosEncodedIdPosition,
     },
 
-    /// A name position belongs to language-owned rather than shared vocabulary.
-    #[error("whole-Logos item {item_index} uses non-Universal root {root:?} at {position:?}")]
+    /// A declaration belongs to language-owned rather than shared vocabulary.
+    #[error("whole-Logos item {item_index} declares non-Universal root {root:?} at {position:?}")]
     NonUniversalEncodedId {
         /// Ordered item index.
         item_index: usize,

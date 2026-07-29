@@ -41,8 +41,8 @@ fn hash(whole: &WholeLogos) -> [u8; 32] {
 
 #[test]
 fn enum_and_application_shapes_retain_every_complete_chain_through_archive() {
-    let vector = encoded_id(VocabularyRoot::Universal, &[4]);
-    let integer = encoded_id(VocabularyRoot::Universal, &[3]);
+    let vector = encoded_id(VocabularyRoot::Rust, &[4]);
+    let integer = encoded_id(VocabularyRoot::Rust, &[3]);
     let application = WholeLogosTypeReference::Application(WholeLogosTypeApplication::new(
         vector.clone(),
         WholeLogosTypeReference::Identity(integer.clone()),
@@ -83,6 +83,41 @@ fn enum_and_application_shapes_retain_every_complete_chain_through_archive() {
         WholeLogos::from_archive_bytes(&archive).expect("restore broadened carrier"),
         original
     );
+}
+
+#[test]
+fn rust_vocabulary_references_survive_archive_while_declarations_stay_universal() {
+    let rust_integer = encoded_id(VocabularyRoot::Rust, &[3]);
+    let original = WholeLogos::new(vec![WholeLogosItem::Newtype(WholeLogosNewtype::new(
+        WholeLogosVisibility::Public,
+        encoded_id(VocabularyRoot::Universal, &[8, 5]),
+        WholeLogosVisibility::Private,
+        WholeLogosTypeReference::Identity(rust_integer.clone()),
+    ))]);
+    let archive = original.to_archive_bytes().expect("archive Rust reference");
+    assert_eq!(
+        WholeLogos::from_archive_bytes(&archive).expect("restore Rust reference"),
+        original
+    );
+
+    let invalid_declaration =
+        WholeLogos::new(vec![WholeLogosItem::Newtype(WholeLogosNewtype::new(
+            WholeLogosVisibility::Public,
+            encoded_id(VocabularyRoot::Rust, &[8, 5]),
+            WholeLogosVisibility::Private,
+            WholeLogosTypeReference::Identity(rust_integer),
+        ))]);
+    let invalid_archive = invalid_declaration
+        .to_archive_bytes()
+        .expect("archive invalid declaration fixture");
+    assert!(matches!(
+        WholeLogos::from_archive_bytes(&invalid_archive),
+        Err(core_logos::WholeLogosArchiveError::NonUniversalEncodedId {
+            position: core_logos::WholeLogosEncodedIdPosition::ItemName,
+            root: VocabularyRoot::Rust,
+            ..
+        })
+    ));
 }
 
 #[test]

@@ -10,9 +10,11 @@ those grades explicit so legacy coverage is not mistaken for production law.
 The conforming carrier is `WholeLogos`. Its current closed fixture item set
 contains attribute-free tuple newtypes and attribute-free, non-generic
 enumerations with unit or positional tuple variants. Type references are
-either one complete identity or a recursive unary application. Every item,
-variant, application head, and reference identity is a complete root-fronted
-`VocabularyEncodedId` chain.
+either one complete identity or a recursive unary application. Every item and
+variant declaration is a complete Universal `VocabularyEncodedId` chain.
+Application heads and referenced types may instead carry a complete
+language-vocabulary chain after typed Nomos transformation; Rust vocabulary
+therefore stays distinct from Universal authored identity.
 
 Fields have no names in encoded data. Deterministic Rust field naming belongs
 to textual conversion and remains undesigned. The production carrier does not
@@ -63,9 +65,10 @@ typed reference.
 
 Both name positions use
 `signal_sema_translator::VocabularyEncodedId`, preserving each complete
-root-fronted module chain opaquely. Archive restoration validates every nested
-position as non-empty Universal vocabulary. The carrier does not resolve,
-shorten, flatten, or reallocate those chains. `WholeLogosVisibility` deliberately admits
+root-fronted module chain opaquely. Archive restoration validates every
+declaration as non-empty Universal vocabulary and every reference as a
+non-empty chain in the closed production root set. The carrier does not
+resolve, shorten, flatten, or reallocate those chains. `WholeLogosVisibility` deliberately admits
 only `Public` and `Private`; broader visibility does not enter this carrier
 through the legacy flat-identifier path.
 
