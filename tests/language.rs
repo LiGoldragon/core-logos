@@ -1,4 +1,4 @@
-//! The three running-example roots share one Logos grammar/declaration pair.
+//! The four fixture roots share one Logos grammar/declaration pair.
 
 use core_logos::{LogosLanguage, LogosLanguageTypeIds, LogosLanguageWords};
 use encoded_name_table::LocalEncodedId;
@@ -16,6 +16,7 @@ fn encoded(chain: &[u16]) -> VocabularyEncodedId {
 fn types() -> LogosLanguageTypeIds {
     LogosLanguageTypeIds {
         newtype: encoded(&[1]),
+        structure: encoded(&[13]),
         enumeration: encoded(&[2]),
         visibility: encoded(&[3]),
         attributes: encoded(&[4]),
@@ -26,6 +27,7 @@ fn types() -> LogosLanguageTypeIds {
         generics: encoded(&[9]),
         generic_parameter: encoded(&[10]),
         type_reference: encoded(&[11]),
+        field: encoded(&[14]),
         variant: encoded(&[12]),
     }
 }
@@ -51,8 +53,12 @@ fn running_example_roots_are_one_addressed_language_declaration() {
     let attributes = declaration
         .verify_root(language.attributes_type())
         .expect("WireAttributes landing closure");
+    let structure = declaration
+        .verify_root(language.struct_type())
+        .expect("ParticularStruct landing closure");
 
     assert!(newtype.addressed_types().contains(language.newtype_type()));
+    assert!(structure.addressed_types().contains(language.struct_type()));
     assert!(
         enumeration
             .addressed_types()
@@ -64,10 +70,10 @@ fn running_example_roots_are_one_addressed_language_declaration() {
             .contains(language.attributes_type())
     );
     assert!(
-        [newtype, enumeration, attributes]
+        [newtype, structure, enumeration, attributes]
             .iter()
             .all(|closure| closure.addressed_types().len() > 1),
-        "all three roots follow the same recursively addressed source catalogs"
+        "all four roots follow the same recursively addressed source catalogs"
     );
 }
 

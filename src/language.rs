@@ -43,6 +43,7 @@ const THIRD: u16 = 3;
 #[derive(Clone, Debug)]
 pub struct LogosLanguageTypeIds {
     pub newtype: VocabularyEncodedId,
+    pub structure: VocabularyEncodedId,
     pub enumeration: VocabularyEncodedId,
     pub visibility: VocabularyEncodedId,
     pub attributes: VocabularyEncodedId,
@@ -53,6 +54,7 @@ pub struct LogosLanguageTypeIds {
     pub generics: VocabularyEncodedId,
     pub generic_parameter: VocabularyEncodedId,
     pub type_reference: VocabularyEncodedId,
+    pub field: VocabularyEncodedId,
     pub variant: VocabularyEncodedId,
 }
 
@@ -60,6 +62,7 @@ impl LogosLanguageTypeIds {
     fn encoded(&self) -> EncodedTypes {
         EncodedTypes {
             newtype: EncodedTypeId::new(self.newtype.clone()),
+            structure: EncodedTypeId::new(self.structure.clone()),
             enumeration: EncodedTypeId::new(self.enumeration.clone()),
             visibility: EncodedTypeId::new(self.visibility.clone()),
             attributes: EncodedTypeId::new(self.attributes.clone()),
@@ -70,6 +73,7 @@ impl LogosLanguageTypeIds {
             generics: EncodedTypeId::new(self.generics.clone()),
             generic_parameter: EncodedTypeId::new(self.generic_parameter.clone()),
             type_reference: EncodedTypeId::new(self.type_reference.clone()),
+            field: EncodedTypeId::new(self.field.clone()),
             variant: EncodedTypeId::new(self.variant.clone()),
         }
     }
@@ -85,6 +89,7 @@ pub struct LogosLanguageWords {
 #[derive(Clone, Debug)]
 struct EncodedTypes {
     newtype: EncodedTypeId<VocabularyRoot>,
+    structure: EncodedTypeId<VocabularyRoot>,
     enumeration: EncodedTypeId<VocabularyRoot>,
     visibility: EncodedTypeId<VocabularyRoot>,
     attributes: EncodedTypeId<VocabularyRoot>,
@@ -95,6 +100,7 @@ struct EncodedTypes {
     generics: EncodedTypeId<VocabularyRoot>,
     generic_parameter: EncodedTypeId<VocabularyRoot>,
     type_reference: EncodedTypeId<VocabularyRoot>,
+    field: EncodedTypeId<VocabularyRoot>,
     variant: EncodedTypeId<VocabularyRoot>,
 }
 
@@ -127,6 +133,19 @@ role!(NewtypeAttributes, 102);
 role!(NewtypeName, 103);
 role!(NewtypeWrappedVisibility, 104);
 role!(NewtypeWrapped, 105);
+
+role!(StructRoot, 130);
+role!(StructVisibility, 131);
+role!(StructAttributes, 132);
+role!(StructName, 133);
+role!(StructGenerics, 134);
+role!(StructFieldsBody, 135);
+role!(StructFields, 136);
+
+role!(FieldRoot, 140);
+role!(FieldVisibility, 141);
+role!(FieldName, 142);
+role!(FieldType, 143);
 
 role!(EnumerationRoot, 110);
 role!(EnumerationVisibility, 111);
@@ -192,6 +211,117 @@ impl StructureRecord<VocabularyRoot> for NewtypeRecord {
 
     fn fields(&self) -> Self::View<'_> {
         NewtypeView(self)
+    }
+}
+
+/// The fixed positional source record for a Logos named-field struct.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+pub struct StructRecord {
+    root: Position<StructRoot, VocabularyRoot>,
+    visibility: Position<StructVisibility, VocabularyRoot>,
+    attributes: Position<StructAttributes, VocabularyRoot>,
+    name: Position<StructName, VocabularyRoot>,
+    generics: Position<StructGenerics, VocabularyRoot>,
+    fields_body: Position<StructFieldsBody, VocabularyRoot>,
+    fields: Position<StructFields, VocabularyRoot>,
+}
+
+impl StructRecord {
+    fn new(types: &EncodedTypes) -> Result<Self, structural_codec::AuthoringError> {
+        let fields = Position::try_new(repeated(&types.field, 0, None))?;
+        Ok(Self {
+            root: Position::try_new(SharedDescriptor::OrderedSequence(
+                OrderedSequence::try_new::<StructVisibility>()?
+                    .then::<StructAttributes>()?
+                    .then::<StructName>()?
+                    .then::<StructGenerics>()?
+                    .then::<StructFieldsBody>()?,
+            ))?,
+            visibility: Position::try_new(delegate(&types.visibility))?,
+            attributes: Position::try_new(repeated(&types.attribute, 0, None))?,
+            name: Position::try_new(SharedDescriptor::Declaration(AtomDescriptor::any_case()))?,
+            generics: Position::try_new(delegate(&types.generics))?,
+            fields_body: Position::try_new(SharedDescriptor::Delimited {
+                boundary: SQUARE,
+                content: fields.role(),
+            })?,
+            fields,
+        })
+    }
+}
+
+/// Borrowed field view for [`StructRecord`].
+pub struct StructView<'a>(&'a StructRecord);
+
+impl BorrowedFieldView<VocabularyRoot> for StructView<'_> {
+    fn expose<Visitor: FieldVisitor<VocabularyRoot>>(&self, visitor: &mut Visitor) {
+        visitor.field(&self.0.root);
+        visitor.field(&self.0.visibility);
+        visitor.field(&self.0.attributes);
+        visitor.field(&self.0.name);
+        visitor.field(&self.0.generics);
+        visitor.field(&self.0.fields_body);
+        visitor.field(&self.0.fields);
+    }
+}
+
+impl StructureRecord<VocabularyRoot> for StructRecord {
+    type View<'a> = StructView<'a>;
+
+    fn root_role(&self) -> StableRoleId {
+        self.root.role()
+    }
+
+    fn fields(&self) -> Self::View<'_> {
+        StructView(self)
+    }
+}
+
+/// The fixed positional source record for one Logos named field.
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
+pub struct FieldRecord {
+    root: Position<FieldRoot, VocabularyRoot>,
+    visibility: Position<FieldVisibility, VocabularyRoot>,
+    name: Position<FieldName, VocabularyRoot>,
+    field_type: Position<FieldType, VocabularyRoot>,
+}
+
+impl FieldRecord {
+    fn new(types: &EncodedTypes) -> Result<Self, structural_codec::AuthoringError> {
+        Ok(Self {
+            root: Position::try_new(SharedDescriptor::OrderedSequence(
+                OrderedSequence::try_new::<FieldVisibility>()?
+                    .then::<FieldName>()?
+                    .then::<FieldType>()?,
+            ))?,
+            visibility: Position::try_new(delegate(&types.visibility))?,
+            name: Position::try_new(SharedDescriptor::Declaration(AtomDescriptor::any_case()))?,
+            field_type: Position::try_new(delegate(&types.type_reference))?,
+        })
+    }
+}
+
+/// Borrowed field view for [`FieldRecord`].
+pub struct FieldView<'a>(&'a FieldRecord);
+
+impl BorrowedFieldView<VocabularyRoot> for FieldView<'_> {
+    fn expose<Visitor: FieldVisitor<VocabularyRoot>>(&self, visitor: &mut Visitor) {
+        visitor.field(&self.0.root);
+        visitor.field(&self.0.visibility);
+        visitor.field(&self.0.name);
+        visitor.field(&self.0.field_type);
+    }
+}
+
+impl StructureRecord<VocabularyRoot> for FieldRecord {
+    type View<'a> = FieldView<'a>;
+
+    fn root_role(&self) -> StableRoleId {
+        self.root.role()
+    }
+
+    fn fields(&self) -> Self::View<'_> {
+        FieldView(self)
     }
 }
 
@@ -309,6 +439,8 @@ impl StructureRecord<VocabularyRoot> for DelimitedSequenceRecord {
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Clone, Debug, Eq, PartialEq)]
 pub enum LogosRule {
     Newtype(NewtypeRecord),
+    Struct(StructRecord),
+    Field(FieldRecord),
     Enumeration(EnumerationRecord),
     Delimited(DelimitedSequenceRecord),
     Structural(StructuralRule<VocabularyRoot>),
@@ -317,6 +449,8 @@ pub enum LogosRule {
 /// Borrowed data-only view of [`LogosRule`].
 pub enum LogosRuleView<'a> {
     Newtype(NewtypeView<'a>),
+    Struct(StructView<'a>),
+    Field(FieldView<'a>),
     Enumeration(EnumerationView<'a>),
     Delimited(DelimitedSequenceView<'a>),
     Structural(StructuralRuleView<'a, VocabularyRoot>),
@@ -326,6 +460,8 @@ impl BorrowedFieldView<VocabularyRoot> for LogosRuleView<'_> {
     fn expose<Visitor: FieldVisitor<VocabularyRoot>>(&self, visitor: &mut Visitor) {
         match self {
             Self::Newtype(view) => view.expose(visitor),
+            Self::Struct(view) => view.expose(visitor),
+            Self::Field(view) => view.expose(visitor),
             Self::Enumeration(view) => view.expose(visitor),
             Self::Delimited(view) => view.expose(visitor),
             Self::Structural(view) => view.expose(visitor),
@@ -339,6 +475,8 @@ impl StructureRecord<VocabularyRoot> for LogosRule {
     fn root_role(&self) -> StableRoleId {
         match self {
             Self::Newtype(record) => record.root_role(),
+            Self::Struct(record) => record.root_role(),
+            Self::Field(record) => record.root_role(),
             Self::Enumeration(record) => record.root_role(),
             Self::Delimited(record) => record.root_role(),
             Self::Structural(record) => record.root_role(),
@@ -348,6 +486,8 @@ impl StructureRecord<VocabularyRoot> for LogosRule {
     fn fields(&self) -> Self::View<'_> {
         match self {
             Self::Newtype(record) => LogosRuleView::Newtype(record.fields()),
+            Self::Struct(record) => LogosRuleView::Struct(record.fields()),
+            Self::Field(record) => LogosRuleView::Field(record.fields()),
             Self::Enumeration(record) => LogosRuleView::Enumeration(record.fields()),
             Self::Delimited(record) => LogosRuleView::Delimited(record.fields()),
             Self::Structural(record) => LogosRuleView::Structural(record.fields()),
@@ -378,6 +518,7 @@ impl LogosLanguage {
         };
         for root in [
             &language.types.newtype,
+            &language.types.structure,
             &language.types.enumeration,
             &language.types.attributes,
         ] {
@@ -396,6 +537,10 @@ impl LogosLanguage {
 
     pub fn newtype_type(&self) -> &EncodedTypeId<VocabularyRoot> {
         &self.types.newtype
+    }
+
+    pub fn struct_type(&self) -> &EncodedTypeId<VocabularyRoot> {
+        &self.types.structure
     }
 
     pub fn enumeration_type(&self) -> &EncodedTypeId<VocabularyRoot> {
@@ -456,6 +601,14 @@ fn seal_grammar(
         entry(
             &types.newtype,
             vec![(IDENTITY, LogosRule::Newtype(NewtypeRecord::new(types)?))],
+        ),
+        entry(
+            &types.structure,
+            vec![(IDENTITY, LogosRule::Struct(StructRecord::new(types)?))],
+        ),
+        entry(
+            &types.field,
+            vec![(IDENTITY, LogosRule::Field(FieldRecord::new(types)?))],
         ),
         entry(
             &types.enumeration,
@@ -630,6 +783,40 @@ fn landing_catalog(
                     types.visibility.clone(),
                 )),
                 LandingFieldDeclaration::for_role::<NewtypeWrapped>(LandingShape::Type(
+                    types.type_reference.clone(),
+                )),
+            ],
+        ),
+        one_landing(
+            &types.structure,
+            vec![
+                LandingFieldDeclaration::for_role::<StructVisibility>(LandingShape::Type(
+                    types.visibility.clone(),
+                )),
+                LandingFieldDeclaration::for_role::<StructAttributes>(LandingShape::sequence(
+                    0,
+                    None,
+                    LandingShape::Type(types.attribute.clone()),
+                )),
+                LandingFieldDeclaration::for_role::<StructName>(LandingShape::Declaration),
+                LandingFieldDeclaration::for_role::<StructGenerics>(LandingShape::Type(
+                    types.generics.clone(),
+                )),
+                LandingFieldDeclaration::for_role::<StructFields>(LandingShape::sequence(
+                    0,
+                    None,
+                    LandingShape::Type(types.field.clone()),
+                )),
+            ],
+        ),
+        one_landing(
+            &types.field,
+            vec![
+                LandingFieldDeclaration::for_role::<FieldVisibility>(LandingShape::Type(
+                    types.visibility.clone(),
+                )),
+                LandingFieldDeclaration::for_role::<FieldName>(LandingShape::Declaration),
+                LandingFieldDeclaration::for_role::<FieldType>(LandingShape::Type(
                     types.type_reference.clone(),
                 )),
             ],
