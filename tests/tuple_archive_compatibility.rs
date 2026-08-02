@@ -7,6 +7,9 @@ use core_logos::{
 use encoded_name_table::LocalEncodedId;
 use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
 
+// These named mirrors were proven byte-identical to the production tuple
+// carriers before their conversion. Retaining the comparison pins that exact
+// archived representation after the public Rust source shape changes.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 struct NamedWholeLogosNewtype {
     visibility: WholeLogosVisibility,
@@ -44,15 +47,15 @@ macro_rules! assert_archive_compatible {
     ($production_type:ty, $named_type:ty, $production:expr, $named:expr) => {{
         let production = $production;
         let named = $named;
-        let production_bytes = rkyv::to_bytes::<rkyv::rancor::Error>(&production)
-            .expect("archive production tuple carrier");
+        let production_bytes =
+            rkyv::to_bytes::<rkyv::rancor::Error>(&production).expect("archive production carrier");
         let named_bytes =
             rkyv::to_bytes::<rkyv::rancor::Error>(&named).expect("archive named-field mirror");
 
         assert_eq!(
             production_bytes.as_slice(),
             named_bytes.as_slice(),
-            "tuple and named-field carriers must emit identical bytes",
+            "production carrier and pre-conversion witness must emit identical bytes",
         );
         assert_eq!(
             size_of::<rkyv::Archived<$production_type>>(),

@@ -180,49 +180,54 @@ pub enum WholeLogosItem {
     Enumeration(WholeLogosEnumeration),
 }
 
-/// An attribute-free, non-generic tuple newtype, stored positionally.
+/// An attribute-free, non-generic newtype declaration.
 ///
-/// The positions are item visibility, declared encoded ID, wrapped-field
-/// visibility, and referenced-type encoded ID. Both IDs retain their complete
-/// root-fronted chains opaquely; this carrier neither resolves nor rewrites
-/// them.
+/// Item visibility, declared encoded ID, wrapped-field visibility, and the
+/// referenced type are retained as distinct named roles. Both IDs retain their
+/// complete root-fronted chains opaquely; this carrier neither resolves nor
+/// rewrites them.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
-pub struct WholeLogosNewtype(
-    WholeLogosVisibility,
-    VocabularyEncodedId,
-    WholeLogosVisibility,
-    WholeLogosTypeReference,
-);
+pub struct WholeLogosNewtype {
+    visibility: WholeLogosVisibility,
+    name: VocabularyEncodedId,
+    wrapped_visibility: WholeLogosVisibility,
+    wrapped: WholeLogosTypeReference,
+}
 
 impl WholeLogosNewtype {
-    /// Construct one positional newtype item.
+    /// Construct one newtype item.
     pub fn new(
         visibility: WholeLogosVisibility,
         name: VocabularyEncodedId,
         wrapped_visibility: WholeLogosVisibility,
         wrapped: WholeLogosTypeReference,
     ) -> Self {
-        Self(visibility, name, wrapped_visibility, wrapped)
+        Self {
+            visibility,
+            name,
+            wrapped_visibility,
+            wrapped,
+        }
     }
 
     /// The item visibility.
     pub const fn visibility(&self) -> &WholeLogosVisibility {
-        &self.0
+        &self.visibility
     }
 
     /// The declaration's complete encoded-ID chain.
     pub const fn name(&self) -> &VocabularyEncodedId {
-        &self.1
+        &self.name
     }
 
-    /// The tuple field's visibility.
+    /// The wrapped field's visibility.
     pub const fn wrapped_visibility(&self) -> &WholeLogosVisibility {
-        &self.2
+        &self.wrapped_visibility
     }
 
     /// The wrapped type's complete encoded-ID chain.
     pub const fn wrapped(&self) -> &WholeLogosTypeReference {
-        &self.3
+        &self.wrapped
     }
 }
 
@@ -235,42 +240,46 @@ pub enum WholeLogosTypeReference {
     Application(WholeLogosTypeApplication),
 }
 
-/// Application head and its one positional payload.
+/// Application head and its one payload.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 #[rkyv(
     serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
     deserialize_bounds(__D::Error: rkyv::rancor::Source),
     bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
 )]
-pub struct WholeLogosTypeApplication(
-    VocabularyEncodedId,
-    #[rkyv(omit_bounds)] Box<WholeLogosTypeReference>,
-);
+pub struct WholeLogosTypeApplication {
+    head: VocabularyEncodedId,
+    #[rkyv(omit_bounds)]
+    payload: Box<WholeLogosTypeReference>,
+}
 
 impl WholeLogosTypeApplication {
     /// Construct a unary application.
     pub fn new(head: VocabularyEncodedId, payload: WholeLogosTypeReference) -> Self {
-        Self(head, Box::new(payload))
+        Self {
+            head,
+            payload: Box::new(payload),
+        }
     }
 
     /// Complete application-head identity.
     pub const fn head(&self) -> &VocabularyEncodedId {
-        &self.0
+        &self.head
     }
 
-    /// Positional payload reference.
+    /// Payload reference.
     pub const fn payload(&self) -> &WholeLogosTypeReference {
-        &self.1
+        &self.payload
     }
 }
 
-/// Attribute-free, non-generic enumeration stored positionally.
+/// Attribute-free, non-generic enumeration.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
-pub struct WholeLogosEnumeration(
-    WholeLogosVisibility,
-    VocabularyEncodedId,
-    Vec<WholeLogosVariant>,
-);
+pub struct WholeLogosEnumeration {
+    visibility: WholeLogosVisibility,
+    name: VocabularyEncodedId,
+    variants: Vec<WholeLogosVariant>,
+}
 
 impl WholeLogosEnumeration {
     /// Construct one enumeration.
@@ -279,43 +288,50 @@ impl WholeLogosEnumeration {
         name: VocabularyEncodedId,
         variants: Vec<WholeLogosVariant>,
     ) -> Self {
-        Self(visibility, name, variants)
+        Self {
+            visibility,
+            name,
+            variants,
+        }
     }
 
     /// Item visibility.
     pub const fn visibility(&self) -> &WholeLogosVisibility {
-        &self.0
+        &self.visibility
     }
 
     /// Complete declaration identity.
     pub const fn name(&self) -> &VocabularyEncodedId {
-        &self.1
+        &self.name
     }
 
     /// Variants in semantic order.
     pub fn variants(&self) -> &[WholeLogosVariant] {
-        &self.2
+        &self.variants
     }
 }
 
 /// One enumeration variant.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
-pub struct WholeLogosVariant(VocabularyEncodedId, WholeLogosVariantPayload);
+pub struct WholeLogosVariant {
+    name: VocabularyEncodedId,
+    payload: WholeLogosVariantPayload,
+}
 
 impl WholeLogosVariant {
     /// Construct one variant.
     pub fn new(name: VocabularyEncodedId, payload: WholeLogosVariantPayload) -> Self {
-        Self(name, payload)
+        Self { name, payload }
     }
 
     /// Complete declaration identity.
     pub const fn name(&self) -> &VocabularyEncodedId {
-        &self.0
+        &self.name
     }
 
     /// Unit or positional tuple payload.
     pub const fn payload(&self) -> &WholeLogosVariantPayload {
-        &self.1
+        &self.payload
     }
 }
 
