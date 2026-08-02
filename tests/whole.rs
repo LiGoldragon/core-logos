@@ -7,11 +7,12 @@ use core_logos::{
 use encoded_name_table::LocalEncodedId;
 use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
 
-// Version 2 fixes the enum/application WholeLogos archive and its pure-content
-// hash. An intentional archive change replaces this under a new versioned name.
-const WHOLE_LOGOS_ARCHIVE_V2_IDENTITY: [u8; 32] = [
-    0x79, 0xcd, 0x05, 0xdc, 0xde, 0x82, 0x58, 0x6c, 0xcc, 0xfd, 0xd8, 0x64, 0x7a, 0x9e, 0x8e, 0x10,
-    0xce, 0x12, 0x5b, 0x41, 0x8b, 0xe9, 0xff, 0x00, 0x83, 0xca, 0x80, 0x37, 0xb7, 0x8c, 0x33, 0x83,
+// Version 3 adds Struct, TraitDef, and TraitImpl alternatives to the closed
+// WholeLogos item vocabulary. An intentional archive change replaces this
+// under a new versioned name.
+const WHOLE_LOGOS_ARCHIVE_V3_IDENTITY: [u8; 32] = [
+    0x0d, 0x6c, 0x32, 0xbc, 0x47, 0x99, 0xf5, 0x2c, 0x46, 0x44, 0x8b, 0x9e, 0x74, 0xa5, 0xa6, 0x71,
+    0x28, 0xd1, 0x2b, 0x4d, 0x2a, 0x2b, 0x75, 0x81, 0x3a, 0xb1, 0x57, 0xda, 0xd1, 0x8d, 0x86, 0xbc,
 ];
 
 fn encoded_id(root: VocabularyRoot, chain: &[u16]) -> VocabularyEncodedId {
@@ -190,7 +191,7 @@ fn the_whole_logos_variant_is_outside_the_pure_content_hash() {
     let identity = whole.content_identity().expect("whole content identity");
     assert!(matches!(identity, WholeLogosContentIdentity::WholeLogos(_)));
     assert_eq!(identity.content_addressed_hash().bytes(), &expected);
-    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V2_IDENTITY);
+    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V3_IDENTITY);
 }
 
 #[test]

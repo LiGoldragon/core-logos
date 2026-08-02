@@ -1,9 +1,9 @@
-//! The ordered whole-Logos carrier used by the first vertical slice.
+//! The ordered whole-Logos carrier used by the vertical language slices.
 //!
 //! This is deliberately separate from the legacy per-item algebra. Every name
 //! position carries a complete production encoded-ID chain, while the supported
-//! item vocabulary is limited to attribute-free newtypes and non-generic
-//! enumerations with unit or positional tuple variants.
+//! item vocabulary covers type declarations, behavior traits, and associated-type
+//! trait implementations without carrying textual Rust spellings.
 
 use capsule_content_identity::{
     ArchiveError, ContentAddressedHash, IdentityHasher, PortableArchive,
@@ -110,6 +110,70 @@ impl WholeLogos {
                         }
                     }
                 }
+                WholeLogosItem::Struct(structure) => {
+                    validate_universal_declaration(
+                        item_index,
+                        WholeLogosEncodedIdPosition::ItemName,
+                        structure.name(),
+                    )?;
+                    for field in structure.fields() {
+                        validate_reference(
+                            item_index,
+                            WholeLogosEncodedIdPosition::StructField,
+                            field,
+                        )?;
+                    }
+                }
+                WholeLogosItem::TraitDef(trait_definition) => {
+                    validate_universal_declaration(
+                        item_index,
+                        WholeLogosEncodedIdPosition::ItemName,
+                        trait_definition.name(),
+                    )?;
+                    for method in trait_definition.methods() {
+                        validate_universal_declaration(
+                            item_index,
+                            WholeLogosEncodedIdPosition::MethodName,
+                            method.name(),
+                        )?;
+                        for parameter in method.parameters() {
+                            validate_reference(
+                                item_index,
+                                WholeLogosEncodedIdPosition::MethodParameter,
+                                parameter,
+                            )?;
+                        }
+                        validate_reference(
+                            item_index,
+                            WholeLogosEncodedIdPosition::MethodReturn,
+                            method.return_type(),
+                        )?;
+                    }
+                }
+                WholeLogosItem::TraitImpl(trait_implementation) => {
+                    validate_reference(
+                        item_index,
+                        WholeLogosEncodedIdPosition::ImplementedTrait,
+                        trait_implementation.implemented_trait(),
+                    )?;
+                    validate_reference(
+                        item_index,
+                        WholeLogosEncodedIdPosition::ImplementingType,
+                        trait_implementation.implementing_type(),
+                    )?;
+                    for binding in trait_implementation.associated_type_bindings() {
+                        validate_universal_declaration(
+                            item_index,
+                            WholeLogosEncodedIdPosition::AssociatedTypeName,
+                            binding.name(),
+                        )?;
+                        validate_reference(
+                            item_index,
+                            WholeLogosEncodedIdPosition::AssociatedTypeValue,
+                            binding.value(),
+                        )?;
+                    }
+                }
             }
         }
         Ok(())
@@ -171,13 +235,19 @@ fn validate_reference_encoded_id(
     Ok(())
 }
 
-/// The closed item vocabulary admitted by [`WholeLogos`] in the first slice.
+/// The closed item vocabulary admitted by [`WholeLogos`].
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub enum WholeLogosItem {
     /// An attribute-free, non-generic tuple newtype.
     Newtype(WholeLogosNewtype),
+    /// A plain, non-generic positional product declaration.
+    Struct(WholeLogosStruct),
     /// An attribute-free, non-generic enumeration.
     Enumeration(WholeLogosEnumeration),
+    /// A non-generic behavior trait definition.
+    TraitDef(WholeLogosTraitDef),
+    /// A trait implementation containing associated-type equalities.
+    TraitImpl(WholeLogosTraitImpl),
 }
 
 /// An attribute-free, non-generic newtype declaration.
@@ -228,6 +298,48 @@ impl WholeLogosNewtype {
     /// The wrapped type's complete encoded-ID chain.
     pub const fn wrapped(&self) -> &WholeLogosTypeReference {
         &self.wrapped
+    }
+}
+
+/// A plain positional product declaration.
+///
+/// Field names are absent because the source language carries field meaning by
+/// position. A textual assembly must project stable local field spellings; no
+/// output identity is allocated here.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosStruct {
+    visibility: WholeLogosVisibility,
+    name: VocabularyEncodedId,
+    fields: Vec<WholeLogosTypeReference>,
+}
+
+impl WholeLogosStruct {
+    /// Construct one positional product.
+    pub fn new(
+        visibility: WholeLogosVisibility,
+        name: VocabularyEncodedId,
+        fields: Vec<WholeLogosTypeReference>,
+    ) -> Self {
+        Self {
+            visibility,
+            name,
+            fields,
+        }
+    }
+
+    /// Item visibility.
+    pub const fn visibility(&self) -> &WholeLogosVisibility {
+        &self.visibility
+    }
+
+    /// Complete declaration identity.
+    pub const fn name(&self) -> &VocabularyEncodedId {
+        &self.name
+    }
+
+    /// Positional field types in semantic order.
+    pub fn fields(&self) -> &[WholeLogosTypeReference] {
+        &self.fields
     }
 }
 
@@ -308,6 +420,148 @@ impl WholeLogosEnumeration {
     /// Variants in semantic order.
     pub fn variants(&self) -> &[WholeLogosVariant] {
         &self.variants
+    }
+}
+
+/// A behavior trait definition whose method receivers are implied.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosTraitDef {
+    visibility: WholeLogosVisibility,
+    name: VocabularyEncodedId,
+    methods: Vec<WholeLogosTraitMethod>,
+}
+
+impl WholeLogosTraitDef {
+    /// Construct one trait definition.
+    pub fn new(
+        visibility: WholeLogosVisibility,
+        name: VocabularyEncodedId,
+        methods: Vec<WholeLogosTraitMethod>,
+    ) -> Self {
+        Self {
+            visibility,
+            name,
+            methods,
+        }
+    }
+
+    /// Item visibility.
+    pub const fn visibility(&self) -> &WholeLogosVisibility {
+        &self.visibility
+    }
+
+    /// Complete trait declaration identity.
+    pub const fn name(&self) -> &VocabularyEncodedId {
+        &self.name
+    }
+
+    /// Method signatures in semantic order.
+    pub fn methods(&self) -> &[WholeLogosTraitMethod] {
+        &self.methods
+    }
+}
+
+/// One trait method signature.
+///
+/// The receiver is not stored: membership in the trait implies it, and Rust
+/// assembly emits `&self`. Parameter names are likewise assembly-local because
+/// Ethos carries only positional parameter types.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosTraitMethod {
+    name: VocabularyEncodedId,
+    parameters: Vec<WholeLogosTypeReference>,
+    return_type: WholeLogosTypeReference,
+}
+
+impl WholeLogosTraitMethod {
+    /// Construct one receiver-implied signature.
+    pub fn new(
+        name: VocabularyEncodedId,
+        parameters: Vec<WholeLogosTypeReference>,
+        return_type: WholeLogosTypeReference,
+    ) -> Self {
+        Self {
+            name,
+            parameters,
+            return_type,
+        }
+    }
+
+    /// Complete method identity.
+    pub const fn name(&self) -> &VocabularyEncodedId {
+        &self.name
+    }
+
+    /// Positional parameter types.
+    pub fn parameters(&self) -> &[WholeLogosTypeReference] {
+        &self.parameters
+    }
+
+    /// Explicit last-position return type.
+    pub const fn return_type(&self) -> &WholeLogosTypeReference {
+        &self.return_type
+    }
+}
+
+/// A trait implementation with associated-type equalities.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosTraitImpl {
+    implemented_trait: WholeLogosTypeReference,
+    implementing_type: WholeLogosTypeReference,
+    associated_type_bindings: Vec<WholeLogosAssociatedTypeBinding>,
+}
+
+impl WholeLogosTraitImpl {
+    /// Construct one trait implementation.
+    pub fn new(
+        implemented_trait: WholeLogosTypeReference,
+        implementing_type: WholeLogosTypeReference,
+        associated_type_bindings: Vec<WholeLogosAssociatedTypeBinding>,
+    ) -> Self {
+        Self {
+            implemented_trait,
+            implementing_type,
+            associated_type_bindings,
+        }
+    }
+
+    /// Implemented trait reference.
+    pub const fn implemented_trait(&self) -> &WholeLogosTypeReference {
+        &self.implemented_trait
+    }
+
+    /// Implementing self type.
+    pub const fn implementing_type(&self) -> &WholeLogosTypeReference {
+        &self.implementing_type
+    }
+
+    /// Associated-type equalities in semantic order.
+    pub fn associated_type_bindings(&self) -> &[WholeLogosAssociatedTypeBinding] {
+        &self.associated_type_bindings
+    }
+}
+
+/// One associated-type equality inside a trait implementation.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosAssociatedTypeBinding {
+    name: VocabularyEncodedId,
+    value: WholeLogosTypeReference,
+}
+
+impl WholeLogosAssociatedTypeBinding {
+    /// Construct `type name = value;`.
+    pub fn new(name: VocabularyEncodedId, value: WholeLogosTypeReference) -> Self {
+        Self { name, value }
+    }
+
+    /// Complete associated-type identity.
+    pub const fn name(&self) -> &VocabularyEncodedId {
+        &self.name
+    }
+
+    /// Bound type reference.
+    pub const fn value(&self) -> &WholeLogosTypeReference {
+        &self.value
     }
 }
 
@@ -419,10 +673,26 @@ pub enum WholeLogosEncodedIdPosition {
     ItemName,
     /// Newtype field reference.
     NewtypeField,
+    /// Positional product field reference.
+    StructField,
     /// Enumeration variant declaration.
     VariantName,
     /// Enumeration tuple-field reference.
     VariantField,
+    /// Trait method declaration.
+    MethodName,
+    /// Trait method parameter reference.
+    MethodParameter,
+    /// Trait method return reference.
+    MethodReturn,
+    /// Implemented trait reference.
+    ImplementedTrait,
+    /// Implementing self-type reference.
+    ImplementingType,
+    /// Associated-type declaration.
+    AssociatedTypeName,
+    /// Associated-type value reference.
+    AssociatedTypeValue,
     /// Unary application head.
     ApplicationHead,
 }

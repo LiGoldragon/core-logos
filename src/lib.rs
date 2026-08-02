@@ -76,8 +76,9 @@ pub use type_reference::{
 pub use use_import::Use;
 pub use visibility::Visibility;
 pub use whole::{
-    EmptyWholeLogosTupleFields, WholeLogos, WholeLogosArchiveError, WholeLogosContentIdentity,
-    WholeLogosEncodedIdPosition, WholeLogosEnumeration, WholeLogosItem, WholeLogosNewtype,
-    WholeLogosTupleFields, WholeLogosTypeApplication, WholeLogosTypeReference, WholeLogosVariant,
-    WholeLogosVariantPayload, WholeLogosVisibility,
+    EmptyWholeLogosTupleFields, WholeLogos, WholeLogosArchiveError,
+    WholeLogosAssociatedTypeBinding, WholeLogosContentIdentity, WholeLogosEncodedIdPosition,
+    WholeLogosEnumeration, WholeLogosItem, WholeLogosNewtype, WholeLogosStruct, WholeLogosTraitDef,
+    WholeLogosTraitImpl, WholeLogosTraitMethod, WholeLogosTupleFields, WholeLogosTypeApplication,
+    WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload, WholeLogosVisibility,
 };
