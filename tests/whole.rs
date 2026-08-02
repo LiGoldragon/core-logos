@@ -1,18 +1,17 @@
 use capsule_content_identity::{IdentityHasher, PortableArchive};
 use core_logos::{
     WholeLogos, WholeLogosContentIdentity, WholeLogosEnumeration, WholeLogosItem,
-    WholeLogosNewtype, WholeLogosTupleFields, WholeLogosTypeApplication, WholeLogosTypeReference,
-    WholeLogosVariant, WholeLogosVariantPayload, WholeLogosVisibility,
+    WholeLogosNewtype, WholeLogosTupleFields, WholeLogosTypeApplication, WholeLogosTypeAttributes,
+    WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload, WholeLogosVisibility,
 };
 use encoded_name_table::LocalEncodedId;
 use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
 
-// Version 3 adds Struct, TraitDef, and TraitImpl alternatives to the closed
-// WholeLogos item vocabulary. An intentional archive change replaces this
-// under a new versioned name.
-const WHOLE_LOGOS_ARCHIVE_V3_IDENTITY: [u8; 32] = [
-    0x0d, 0x6c, 0x32, 0xbc, 0x47, 0x99, 0xf5, 0x2c, 0x46, 0x44, 0x8b, 0x9e, 0x74, 0xa5, 0xa6, 0x71,
-    0x28, 0xd1, 0x2b, 0x4d, 0x2a, 0x2b, 0x75, 0x81, 0x3a, 0xb1, 0x57, 0xda, 0xd1, 0x8d, 0x86, 0xbc,
+// Version 4 adds the canonical type-attribute policy to declarations. An
+// intentional archive change replaces this under a new versioned name.
+const WHOLE_LOGOS_ARCHIVE_V4_IDENTITY: [u8; 32] = [
+    0xb2, 0xe5, 0xa2, 0x51, 0x78, 0x06, 0x1d, 0xaa, 0x00, 0x00, 0x66, 0x86, 0xef, 0x3c, 0x0e, 0x3b,
+    0xe2, 0x80, 0x8e, 0x2d, 0xd8, 0x68, 0xe1, 0xa9, 0x76, 0x72, 0xfa, 0xc8, 0xbe, 0xab, 0x0c, 0x53,
 ];
 
 fn encoded_id(root: VocabularyRoot, chain: &[u16]) -> VocabularyEncodedId {
@@ -66,11 +65,7 @@ fn enum_and_application_shapes_retain_every_complete_chain_through_archive() {
                 WholeLogosVariant::new(
                     encoded_id(VocabularyRoot::Universal, &[8, 6, 2]),
                     WholeLogosVariantPayload::Tuple(
-                        WholeLogosTupleFields::new(vec![
-                            WholeLogosTypeReference::Identity(integer),
-                            application,
-                        ])
-                        .expect("non-empty tuple"),
+                        WholeLogosTupleFields::new(vec![application]).expect("single-field tuple"),
                     ),
                 ),
             ],
@@ -191,7 +186,37 @@ fn the_whole_logos_variant_is_outside_the_pure_content_hash() {
     let identity = whole.content_identity().expect("whole content identity");
     assert!(matches!(identity, WholeLogosContentIdentity::WholeLogos(_)));
     assert_eq!(identity.content_addressed_hash().bytes(), &expected);
-    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V3_IDENTITY);
+    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V4_IDENTITY);
+}
+
+#[test]
+fn tuple_variants_refuse_zero_and_multiple_fields_without_rewriting_payloads() {
+    assert_eq!(
+        WholeLogosTupleFields::new(Vec::new())
+            .expect_err("unit payload has its own variant")
+            .found(),
+        0,
+    );
+    let error = WholeLogosTupleFields::new(vec![
+        WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[1])),
+        WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[2])),
+    ])
+    .expect_err("multi-field data requires a named struct payload");
+    assert_eq!(error.found(), 2);
+}
+
+#[test]
+fn type_attribute_policy_is_canonical_content() {
+    let plain = newtype(&[1, 1], &[7]);
+    let WholeLogosItem::Newtype(newtype) = plain.clone() else {
+        panic!("newtype fixture")
+    };
+    let wire = WholeLogosItem::Newtype(newtype.with_attributes(WholeLogosTypeAttributes::Wire));
+
+    assert_ne!(
+        hash(&WholeLogos::new(vec![plain])),
+        hash(&WholeLogos::new(vec![wire]))
+    );
 }
 
 #[test]

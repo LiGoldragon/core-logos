@@ -100,6 +100,12 @@ impl WholeLogos {
                             variant.name(),
                         )?;
                         if let WholeLogosVariantPayload::Tuple(fields) = variant.payload() {
+                            if fields.fields().len() != 1 {
+                                return Err(WholeLogosArchiveError::InvalidTupleVariantArity {
+                                    item_index,
+                                    found: fields.fields().len(),
+                                });
+                            }
                             for field in fields.fields() {
                                 validate_reference(
                                     item_index,
@@ -238,11 +244,11 @@ fn validate_reference_encoded_id(
 /// The closed item vocabulary admitted by [`WholeLogos`].
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub enum WholeLogosItem {
-    /// An attribute-free, non-generic tuple newtype.
+    /// A non-generic tuple newtype.
     Newtype(WholeLogosNewtype),
-    /// A plain, non-generic positional product declaration.
+    /// A non-generic positional product declaration.
     Struct(WholeLogosStruct),
-    /// An attribute-free, non-generic enumeration.
+    /// A non-generic enumeration.
     Enumeration(WholeLogosEnumeration),
     /// A non-generic behavior trait definition.
     TraitDef(WholeLogosTraitDef),
@@ -250,7 +256,7 @@ pub enum WholeLogosItem {
     TraitImpl(WholeLogosTraitImpl),
 }
 
-/// An attribute-free, non-generic newtype declaration.
+/// A non-generic newtype declaration with a typed emission policy.
 ///
 /// Item visibility, declared encoded ID, wrapped-field visibility, and the
 /// referenced type are retained as distinct named roles. Both IDs retain their
@@ -258,6 +264,7 @@ pub enum WholeLogosItem {
 /// rewrites them.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosNewtype {
+    attributes: WholeLogosTypeAttributes,
     visibility: WholeLogosVisibility,
     name: VocabularyEncodedId,
     wrapped_visibility: WholeLogosVisibility,
@@ -273,11 +280,23 @@ impl WholeLogosNewtype {
         wrapped: WholeLogosTypeReference,
     ) -> Self {
         Self {
+            attributes: WholeLogosTypeAttributes::Plain,
             visibility,
             name,
             wrapped_visibility,
             wrapped,
         }
+    }
+
+    /// Select the canonical attribute preamble emitted for this declaration.
+    pub const fn with_attributes(mut self, attributes: WholeLogosTypeAttributes) -> Self {
+        self.attributes = attributes;
+        self
+    }
+
+    /// Canonical declaration-attribute policy.
+    pub const fn attributes(&self) -> WholeLogosTypeAttributes {
+        self.attributes
     }
 
     /// The item visibility.
@@ -301,13 +320,14 @@ impl WholeLogosNewtype {
     }
 }
 
-/// A plain positional product declaration.
+/// A positional product declaration with a typed emission policy.
 ///
 /// Field names are absent because the source language carries field meaning by
 /// position. A textual assembly must project stable local field spellings; no
 /// output identity is allocated here.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosStruct {
+    attributes: WholeLogosTypeAttributes,
     visibility: WholeLogosVisibility,
     name: VocabularyEncodedId,
     fields: Vec<WholeLogosTypeReference>,
@@ -321,10 +341,22 @@ impl WholeLogosStruct {
         fields: Vec<WholeLogosTypeReference>,
     ) -> Self {
         Self {
+            attributes: WholeLogosTypeAttributes::Plain,
             visibility,
             name,
             fields,
         }
+    }
+
+    /// Select the canonical attribute preamble emitted for this declaration.
+    pub const fn with_attributes(mut self, attributes: WholeLogosTypeAttributes) -> Self {
+        self.attributes = attributes;
+        self
+    }
+
+    /// Canonical declaration-attribute policy.
+    pub const fn attributes(&self) -> WholeLogosTypeAttributes {
+        self.attributes
     }
 
     /// Item visibility.
@@ -385,9 +417,10 @@ impl WholeLogosTypeApplication {
     }
 }
 
-/// Attribute-free, non-generic enumeration.
+/// A non-generic enumeration with a typed emission policy.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosEnumeration {
+    attributes: WholeLogosTypeAttributes,
     visibility: WholeLogosVisibility,
     name: VocabularyEncodedId,
     variants: Vec<WholeLogosVariant>,
@@ -401,10 +434,22 @@ impl WholeLogosEnumeration {
         variants: Vec<WholeLogosVariant>,
     ) -> Self {
         Self {
+            attributes: WholeLogosTypeAttributes::Plain,
             visibility,
             name,
             variants,
         }
+    }
+
+    /// Select the canonical attribute preamble emitted for this declaration.
+    pub const fn with_attributes(mut self, attributes: WholeLogosTypeAttributes) -> Self {
+        self.attributes = attributes;
+        self
+    }
+
+    /// Canonical declaration-attribute policy.
+    pub const fn attributes(&self) -> WholeLogosTypeAttributes {
+        self.attributes
     }
 
     /// Item visibility.
@@ -594,21 +639,20 @@ impl WholeLogosVariant {
 pub enum WholeLogosVariantPayload {
     /// Unit variant.
     Unit,
-    /// One or more positional tuple fields.
+    /// Exactly one positional payload field.
     Tuple(WholeLogosTupleFields),
 }
 
-/// Positional tuple fields. No stored field names exist.
+/// The single positional field of an enumeration payload.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosTupleFields(Vec<WholeLogosTypeReference>);
 
 impl WholeLogosTupleFields {
-    /// Construct a non-empty tuple payload.
-    pub fn new(fields: Vec<WholeLogosTypeReference>) -> Result<Self, EmptyWholeLogosTupleFields> {
-        if fields.is_empty() {
-            Err(EmptyWholeLogosTupleFields)
-        } else {
-            Ok(Self(fields))
+    /// Construct an exactly-one-field tuple payload.
+    pub fn new(fields: Vec<WholeLogosTypeReference>) -> Result<Self, WholeLogosTupleFieldsError> {
+        match fields.len() {
+            1 => Ok(Self(fields)),
+            found => Err(WholeLogosTupleFieldsError { found }),
         }
     }
 
@@ -618,10 +662,36 @@ impl WholeLogosTupleFields {
     }
 }
 
-/// A tuple-payload construction attempted to encode no fields.
+/// A tuple payload did not contain exactly one positional field.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
-#[error("tuple variant payload requires at least one positional field")]
-pub struct EmptyWholeLogosTupleFields;
+#[error("tuple variant payload requires exactly one positional field, found {found}")]
+pub struct WholeLogosTupleFieldsError {
+    found: usize,
+}
+
+impl WholeLogosTupleFieldsError {
+    /// Refused positional-field count.
+    pub const fn found(self) -> usize {
+        self.found
+    }
+}
+
+/// Canonical attribute policy carried by Whole Logos type declarations.
+///
+/// `Wire` is the existing Interface `WireAttributes` preamble: rustfmt is
+/// skipped, NOTA derives are feature-gated, and the rkyv plus ordinary value
+/// derives are emitted. The rkyv 0.8 little-endian, 32-bit pointer, unaligned
+/// archive settings remain dependency features of the consuming Rust crate.
+#[derive(
+    Clone, Copy, Debug, Default, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize,
+)]
+pub enum WholeLogosTypeAttributes {
+    /// No declaration attributes; used by Nexus types.
+    #[default]
+    Plain,
+    /// The canonical Interface wire preamble.
+    Wire,
+}
 
 /// Visibility admitted by the attribute-free newtype slice.
 ///
@@ -723,5 +793,14 @@ pub enum WholeLogosArchiveError {
         position: WholeLogosEncodedIdPosition,
         /// Unexpected vocabulary root.
         root: VocabularyRoot,
+    },
+
+    /// An archived tuple variant bypassed the exactly-one-field constructor law.
+    #[error("whole-Logos item {item_index} has tuple variant arity {found}; expected exactly one")]
+    InvalidTupleVariantArity {
+        /// Ordered item index.
+        item_index: usize,
+        /// Archived positional-field count.
+        found: usize,
     },
 }

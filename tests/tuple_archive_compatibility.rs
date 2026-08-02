@@ -2,7 +2,8 @@ use std::mem::{align_of, size_of};
 
 use core_logos::{
     WholeLogosEnumeration, WholeLogosNewtype, WholeLogosTupleFields, WholeLogosTypeApplication,
-    WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload, WholeLogosVisibility,
+    WholeLogosTypeAttributes, WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload,
+    WholeLogosVisibility,
 };
 use encoded_name_table::LocalEncodedId;
 use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
@@ -12,6 +13,7 @@ use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
 // archived representation after the public Rust source shape changes.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 struct NamedWholeLogosNewtype {
+    attributes: WholeLogosTypeAttributes,
     visibility: WholeLogosVisibility,
     name: VocabularyEncodedId,
     wrapped_visibility: WholeLogosVisibility,
@@ -32,6 +34,7 @@ struct NamedWholeLogosTypeApplication {
 
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 struct NamedWholeLogosEnumeration {
+    attributes: WholeLogosTypeAttributes,
     visibility: WholeLogosVisibility,
     name: VocabularyEncodedId,
     variants: Vec<WholeLogosVariant>,
@@ -139,6 +142,7 @@ fn named_fields_preserve_every_whole_logos_tuple_carrier_archive() {
             wrapped.clone(),
         ),
         NamedWholeLogosNewtype {
+            attributes: WholeLogosTypeAttributes::Plain,
             visibility: WholeLogosVisibility::Public,
             name: newtype_name,
             wrapped_visibility: WholeLogosVisibility::Private,
@@ -148,17 +152,16 @@ fn named_fields_preserve_every_whole_logos_tuple_carrier_archive() {
 
     let variant_name = encoded_id(VocabularyRoot::Universal, &[47, 23, 29]);
     let variant_payload = WholeLogosVariantPayload::Tuple(
-        WholeLogosTupleFields::new(vec![
-            WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Rust, &[47, 31])),
-            WholeLogosTypeReference::Application(WholeLogosTypeApplication::new(
+        WholeLogosTupleFields::new(vec![WholeLogosTypeReference::Application(
+            WholeLogosTypeApplication::new(
                 encoded_id(VocabularyRoot::Rust, &[47, 37]),
                 WholeLogosTypeReference::Identity(encoded_id(
                     VocabularyRoot::Universal,
                     &[47, 41, 43],
                 )),
-            )),
-        ])
-        .expect("nonempty variant payload"),
+            ),
+        )])
+        .expect("single-field variant payload"),
     );
     assert_archive_compatible!(
         WholeLogosVariant,
@@ -187,6 +190,7 @@ fn named_fields_preserve_every_whole_logos_tuple_carrier_archive() {
             variants.clone(),
         ),
         NamedWholeLogosEnumeration {
+            attributes: WholeLogosTypeAttributes::Plain,
             visibility: WholeLogosVisibility::Private,
             name: enumeration_name,
             variants,
