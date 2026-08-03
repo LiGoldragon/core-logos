@@ -1,17 +1,18 @@
 use capsule_content_identity::{IdentityHasher, PortableArchive};
 use core_logos::{
     WholeLogos, WholeLogosContentIdentity, WholeLogosEnumeration, WholeLogosItem,
-    WholeLogosNewtype, WholeLogosTupleFields, WholeLogosTypeApplication, WholeLogosTypeAttributes,
-    WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload, WholeLogosVisibility,
+    WholeLogosNewtype, WholeLogosTable, WholeLogosTupleFields, WholeLogosTypeApplication,
+    WholeLogosTypeAttributes, WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload,
+    WholeLogosVisibility,
 };
 use encoded_name_table::LocalEncodedId;
 use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
 
-// Version 4 adds the canonical type-attribute policy to declarations. An
+// Version 5 adds Sema table declarations and stored-value attributes. An
 // intentional archive change replaces this under a new versioned name.
-const WHOLE_LOGOS_ARCHIVE_V4_IDENTITY: [u8; 32] = [
-    0xb2, 0xe5, 0xa2, 0x51, 0x78, 0x06, 0x1d, 0xaa, 0x00, 0x00, 0x66, 0x86, 0xef, 0x3c, 0x0e, 0x3b,
-    0xe2, 0x80, 0x8e, 0x2d, 0xd8, 0x68, 0xe1, 0xa9, 0x76, 0x72, 0xfa, 0xc8, 0xbe, 0xab, 0x0c, 0x53,
+const WHOLE_LOGOS_ARCHIVE_V5_IDENTITY: [u8; 32] = [
+    0xc6, 0xe1, 0xd3, 0x03, 0x44, 0x5e, 0x3f, 0x31, 0x40, 0x23, 0xfa, 0x2b, 0xf7, 0xa0, 0x12, 0x4d,
+    0x92, 0xa4, 0x99, 0x6c, 0x45, 0xd4, 0x49, 0xd0, 0xe9, 0x98, 0xe9, 0x78, 0x4f, 0xf6, 0xe5, 0x89,
 ];
 
 fn encoded_id(root: VocabularyRoot, chain: &[u16]) -> VocabularyEncodedId {
@@ -186,7 +187,7 @@ fn the_whole_logos_variant_is_outside_the_pure_content_hash() {
     let identity = whole.content_identity().expect("whole content identity");
     assert!(matches!(identity, WholeLogosContentIdentity::WholeLogos(_)));
     assert_eq!(identity.content_addressed_hash().bytes(), &expected);
-    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V4_IDENTITY);
+    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V5_IDENTITY);
 }
 
 #[test]
@@ -216,6 +217,29 @@ fn type_attribute_policy_is_canonical_content() {
     assert_ne!(
         hash(&WholeLogos::new(vec![plain])),
         hash(&WholeLogos::new(vec![wire]))
+    );
+}
+
+#[test]
+fn sema_table_record_and_key_shape_survive_archive_and_move_schema_identity() {
+    let name = encoded_id(VocabularyRoot::Universal, &[31]);
+    let record = WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[32]));
+    let domain_key =
+        WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[33]));
+    let identifier_key =
+        WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[34]));
+    let table = WholeLogosTable::new(name.clone(), record.clone(), domain_key);
+    let changed = WholeLogosTable::new(name, record, identifier_key);
+    let whole = WholeLogos::new(vec![WholeLogosItem::Table(table.clone())]);
+
+    let archive = whole.to_archive_bytes().expect("archive Sema table");
+    assert_eq!(
+        WholeLogos::from_archive_bytes(&archive).expect("restore Sema table"),
+        whole,
+    );
+    assert_ne!(
+        table.schema_hash().expect("table schema hash"),
+        changed.schema_hash().expect("changed table schema hash"),
     );
 }
 

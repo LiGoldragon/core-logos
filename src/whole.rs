@@ -180,6 +180,23 @@ impl WholeLogos {
                         )?;
                     }
                 }
+                WholeLogosItem::Table(table) => {
+                    validate_universal_declaration(
+                        item_index,
+                        WholeLogosEncodedIdPosition::ItemName,
+                        table.name(),
+                    )?;
+                    validate_reference(
+                        item_index,
+                        WholeLogosEncodedIdPosition::TableRecord,
+                        table.record(),
+                    )?;
+                    validate_reference(
+                        item_index,
+                        WholeLogosEncodedIdPosition::TableKey,
+                        table.key(),
+                    )?;
+                }
             }
         }
         Ok(())
@@ -254,6 +271,8 @@ pub enum WholeLogosItem {
     TraitDef(WholeLogosTraitDef),
     /// A trait implementation containing associated-type equalities.
     TraitImpl(WholeLogosTraitImpl),
+    /// A domain-keyed Sema table declaration.
+    Table(WholeLogosTable),
 }
 
 /// A non-generic newtype declaration with a typed emission policy.
@@ -372,6 +391,52 @@ impl WholeLogosStruct {
     /// Positional field types in semantic order.
     pub fn fields(&self) -> &[WholeLogosTypeReference] {
         &self.fields
+    }
+}
+
+/// One Sema table and the exact record/key types that define its stored shape.
+///
+/// The table name is its stable encoded identity. Its current textual spelling
+/// is a NameTree concern resolved only at Rust assembly, while the content hash
+/// remains stable across a rename.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosTable {
+    name: VocabularyEncodedId,
+    record: WholeLogosTypeReference,
+    key: WholeLogosTypeReference,
+}
+
+impl WholeLogosTable {
+    /// Construct one typed domain table declaration.
+    pub fn new(
+        name: VocabularyEncodedId,
+        record: WholeLogosTypeReference,
+        key: WholeLogosTypeReference,
+    ) -> Self {
+        Self { name, record, key }
+    }
+
+    /// Stable table/family identity.
+    pub const fn name(&self) -> &VocabularyEncodedId {
+        &self.name
+    }
+
+    /// Stored record type.
+    pub const fn record(&self) -> &WholeLogosTypeReference {
+        &self.record
+    }
+
+    /// Authored key type.
+    pub const fn key(&self) -> &WholeLogosTypeReference {
+        &self.key
+    }
+
+    /// Content hash of this exact record/key declaration.
+    pub fn schema_hash(&self) -> Result<[u8; 32], ArchiveError> {
+        let bytes = <Self as PortableArchive>::to_archive_bytes(self)?;
+        let mut hasher = IdentityHasher::unprimed();
+        hasher.update_length_prefixed(bytes.as_ref());
+        Ok(hasher.finalize_bytes())
     }
 }
 
@@ -691,6 +756,8 @@ pub enum WholeLogosTypeAttributes {
     Plain,
     /// The canonical Interface wire preamble.
     Wire,
+    /// The portable rkyv value preamble for Sema record types.
+    Stored,
 }
 
 /// Visibility admitted by the attribute-free newtype slice.
@@ -763,6 +830,10 @@ pub enum WholeLogosEncodedIdPosition {
     AssociatedTypeName,
     /// Associated-type value reference.
     AssociatedTypeValue,
+    /// Stored record reference of a Sema table.
+    TableRecord,
+    /// Authored key reference of a Sema table.
+    TableKey,
     /// Unary application head.
     ApplicationHead,
 }

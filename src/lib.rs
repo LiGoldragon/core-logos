@@ -78,8 +78,8 @@ pub use visibility::Visibility;
 pub use whole::{
     WholeLogos, WholeLogosArchiveError, WholeLogosAssociatedTypeBinding, WholeLogosContentIdentity,
     WholeLogosEncodedIdPosition, WholeLogosEnumeration, WholeLogosItem, WholeLogosNewtype,
-    WholeLogosStruct, WholeLogosTraitDef, WholeLogosTraitImpl, WholeLogosTraitMethod,
-    WholeLogosTupleFields, WholeLogosTupleFieldsError, WholeLogosTypeApplication,
-    WholeLogosTypeAttributes, WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload,
-    WholeLogosVisibility,
+    WholeLogosStruct, WholeLogosTable, WholeLogosTraitDef, WholeLogosTraitImpl,
+    WholeLogosTraitMethod, WholeLogosTupleFields, WholeLogosTupleFieldsError,
+    WholeLogosTypeApplication, WholeLogosTypeAttributes, WholeLogosTypeReference,
+    WholeLogosVariant, WholeLogosVariantPayload, WholeLogosVisibility,
 };
