@@ -404,6 +404,8 @@ pub struct WholeLogosTable {
     name: VocabularyEncodedId,
     record: WholeLogosTypeReference,
     key: WholeLogosTypeReference,
+    record_storage: WholeLogosStorageFingerprint,
+    key_storage: WholeLogosStorageFingerprint,
 }
 
 impl WholeLogosTable {
@@ -412,8 +414,16 @@ impl WholeLogosTable {
         name: VocabularyEncodedId,
         record: WholeLogosTypeReference,
         key: WholeLogosTypeReference,
+        record_storage: WholeLogosStorageFingerprint,
+        key_storage: WholeLogosStorageFingerprint,
     ) -> Self {
-        Self { name, record, key }
+        Self {
+            name,
+            record,
+            key,
+            record_storage,
+            key_storage,
+        }
     }
 
     /// Stable table/family identity.
@@ -431,12 +441,45 @@ impl WholeLogosTable {
         &self.key
     }
 
+    /// Deterministic fingerprint of the record's complete generated storage
+    /// shape, including transitive local declarations and explicit external
+    /// storage contracts.
+    pub const fn record_storage(&self) -> WholeLogosStorageFingerprint {
+        self.record_storage
+    }
+
+    /// Deterministic fingerprint of the key's complete storage shape.
+    pub const fn key_storage(&self) -> WholeLogosStorageFingerprint {
+        self.key_storage
+    }
+
     /// Content hash of this exact record/key declaration.
     pub fn schema_hash(&self) -> Result<[u8; 32], ArchiveError> {
         let bytes = <Self as PortableArchive>::to_archive_bytes(self)?;
         let mut hasher = IdentityHasher::unprimed();
         hasher.update_length_prefixed(bytes.as_ref());
         Ok(hasher.finalize_bytes())
+    }
+}
+
+/// One authoritative storage-shape fingerprint carried into a table schema.
+///
+/// Locally generated shapes derive this value from their complete structural
+/// declaration graph. External types require the owning assembly to supply the
+/// corresponding content/ABI contract explicitly; an encoded type name alone
+/// is never treated as evidence of byte compatibility.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosStorageFingerprint([u8; 32]);
+
+impl WholeLogosStorageFingerprint {
+    /// Construct from one complete storage contract fingerprint.
+    pub const fn new(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    /// Fingerprint bytes.
+    pub const fn bytes(self) -> [u8; 32] {
+        self.0
     }
 }
 
