@@ -81,10 +81,16 @@ impl WholeLogos {
                         WholeLogosEncodedIdPosition::ItemName,
                         newtype.name(),
                     )?;
+                    validate_newtype_type_parameters(item_index, newtype)?;
                     validate_reference(
                         item_index,
                         WholeLogosEncodedIdPosition::NewtypeField,
                         newtype.wrapped(),
+                    )?;
+                    validate_parameter_references(
+                        item_index,
+                        newtype.wrapped(),
+                        newtype.type_parameters(),
                     )?;
                 }
                 WholeLogosItem::Enumeration(enumeration) => {
@@ -233,6 +239,11 @@ fn validate_reference(
         WholeLogosTypeReference::Identity(encoded_id) => {
             validate_reference_encoded_id(item_index, position, encoded_id)
         }
+        WholeLogosTypeReference::Parameter(name) => validate_reference_encoded_id(
+            item_index,
+            WholeLogosEncodedIdPosition::TypeParameterName,
+            name,
+        ),
         WholeLogosTypeReference::Application(application) => {
             validate_reference_encoded_id(
                 item_index,
@@ -244,6 +255,60 @@ fn validate_reference(
             }
             for argument in application.arguments() {
                 validate_reference(item_index, position, argument)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+fn validate_newtype_type_parameters(
+    item_index: usize,
+    newtype: &WholeLogosNewtype,
+) -> Result<(), WholeLogosArchiveError> {
+    for (index, parameter) in newtype.type_parameters().iter().enumerate() {
+        validate_reference_encoded_id(
+            item_index,
+            WholeLogosEncodedIdPosition::TypeParameterName,
+            parameter.name(),
+        )?;
+        validate_reference_encoded_id(
+            item_index,
+            WholeLogosEncodedIdPosition::TypeParameterBound,
+            parameter.bound(),
+        )?;
+        if newtype.type_parameters()[..index]
+            .iter()
+            .any(|prior| prior.name() == parameter.name())
+        {
+            return Err(WholeLogosArchiveError::DuplicateTypeParameterName {
+                item_index,
+                name: parameter.name().clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_parameter_references(
+    item_index: usize,
+    reference: &WholeLogosTypeReference,
+    parameters: &[WholeLogosTypeParameter],
+) -> Result<(), WholeLogosArchiveError> {
+    match reference {
+        WholeLogosTypeReference::Identity(_) => Ok(()),
+        WholeLogosTypeReference::Parameter(name) => {
+            if parameters.iter().any(|parameter| parameter.name() == name) {
+                Ok(())
+            } else {
+                Err(WholeLogosArchiveError::UndeclaredTypeParameter {
+                    item_index,
+                    name: name.clone(),
+                })
+            }
+        }
+        WholeLogosTypeReference::Application(application) => {
+            for argument in application.arguments() {
+                validate_parameter_references(item_index, argument, parameters)?;
             }
             Ok(())
         }
@@ -292,6 +357,7 @@ pub struct WholeLogosNewtype {
     attributes: WholeLogosTypeAttributes,
     visibility: WholeLogosVisibility,
     name: VocabularyEncodedId,
+    type_parameters: Vec<WholeLogosTypeParameter>,
     wrapped_visibility: WholeLogosVisibility,
     wrapped: WholeLogosTypeReference,
 }
@@ -308,6 +374,7 @@ impl WholeLogosNewtype {
             attributes: WholeLogosTypeAttributes::Plain,
             visibility,
             name,
+            type_parameters: Vec::new(),
             wrapped_visibility,
             wrapped,
         }
@@ -316,6 +383,12 @@ impl WholeLogosNewtype {
     /// Select the canonical attribute preamble emitted for this declaration.
     pub const fn with_attributes(mut self, attributes: WholeLogosTypeAttributes) -> Self {
         self.attributes = attributes;
+        self
+    }
+
+    /// Attach the ordered trait-quality parameters picked up by this item.
+    pub fn with_type_parameters(mut self, type_parameters: Vec<WholeLogosTypeParameter>) -> Self {
+        self.type_parameters = type_parameters;
         self
     }
 
@@ -332,6 +405,11 @@ impl WholeLogosNewtype {
     /// The declaration's complete encoded-ID chain.
     pub const fn name(&self) -> &VocabularyEncodedId {
         &self.name
+    }
+
+    /// Type parameters in first-use order.
+    pub fn type_parameters(&self) -> &[WholeLogosTypeParameter] {
+        &self.type_parameters
     }
 
     /// The wrapped field's visibility.
@@ -494,8 +572,34 @@ impl WholeLogosStorageFingerprint {
 pub enum WholeLogosTypeReference {
     /// One complete Universal or language-vocabulary encoded-ID chain.
     Identity(VocabularyEncodedId),
+    /// A use of an item-local type parameter, preserving its proper name.
+    Parameter(VocabularyEncodedId),
     /// One non-empty adjacent angle application such as `Result<Vector<T>, E>`.
     Application(WholeLogosTypeApplication),
+}
+
+/// An item-local type parameter with a trait-quality bound.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosTypeParameter {
+    name: VocabularyEncodedId,
+    bound: VocabularyEncodedId,
+}
+
+impl WholeLogosTypeParameter {
+    /// Construct one retained parameter and its concept-layer bound.
+    pub fn new(name: VocabularyEncodedId, bound: VocabularyEncodedId) -> Self {
+        Self { name, bound }
+    }
+
+    /// Proper parameter name, never Rust-renamed in this carrier.
+    pub const fn name(&self) -> &VocabularyEncodedId {
+        &self.name
+    }
+
+    /// Authored trait-quality bound.
+    pub const fn bound(&self) -> &VocabularyEncodedId {
+        &self.bound
+    }
 }
 
 /// One non-empty, ordered generic application.
@@ -894,6 +998,10 @@ pub enum WholeLogosEncodedIdPosition {
     TableKey,
     /// Generic application head.
     ApplicationHead,
+    /// Item-local type parameter name.
+    TypeParameterName,
+    /// Trait-quality bound of an item-local type parameter.
+    TypeParameterBound,
 }
 
 /// A typed failure while hashing or restoring whole-Logos content.
@@ -938,5 +1046,23 @@ pub enum WholeLogosArchiveError {
     EmptyTypeArguments {
         /// Item containing the invalid type application.
         item_index: usize,
+    },
+
+    /// An item declared the same type-parameter name twice.
+    #[error("whole-Logos item {item_index} repeats type parameter {name:?}")]
+    DuplicateTypeParameterName {
+        /// Item containing the duplicate.
+        item_index: usize,
+        /// Repeated parameter name.
+        name: VocabularyEncodedId,
+    },
+
+    /// A parameter use had no item-local declaration.
+    #[error("whole-Logos item {item_index} uses undeclared type parameter {name:?}")]
+    UndeclaredTypeParameter {
+        /// Item containing the use.
+        item_index: usize,
+        /// Missing parameter name.
+        name: VocabularyEncodedId,
     },
 }

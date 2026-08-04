@@ -8,11 +8,11 @@ use core_logos::{
 use encoded_name_table::LocalEncodedId;
 use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
 
-// Version 7 admits non-empty n-ary type applications. An intentional archive
-// change replaces the preceding versioned content identity.
-const WHOLE_LOGOS_ARCHIVE_V7_IDENTITY: [u8; 32] = [
-    0xbe, 0x17, 0x62, 0x27, 0x8c, 0x50, 0x37, 0xf2, 0x66, 0xfb, 0x8e, 0x29, 0xf4, 0x0a, 0x6d, 0x90,
-    0x6f, 0x45, 0x87, 0xf4, 0xe0, 0x62, 0x6b, 0x60, 0xf8, 0x82, 0xf5, 0xf4, 0x74, 0xfb, 0x24, 0xf2,
+// Version 8 retains strict type-parameter/bound carriers. An intentional
+// archive change replaces the preceding versioned content identity.
+const WHOLE_LOGOS_ARCHIVE_V8_IDENTITY: [u8; 32] = [
+    0xd9, 0xff, 0x22, 0x80, 0xfa, 0xc8, 0xdf, 0x78, 0xdb, 0x37, 0xae, 0x2f, 0xcf, 0x41, 0x34, 0x0f,
+    0xb5, 0x1d, 0x86, 0x3b, 0x7b, 0xa7, 0xb9, 0xdb, 0x2b, 0x13, 0x08, 0xec, 0xf9, 0x91, 0xb0, 0x9a,
 ];
 
 fn encoded_id(root: VocabularyRoot, chain: &[u16]) -> VocabularyEncodedId {
@@ -142,6 +142,7 @@ fn ordered_typed_items_and_complete_encoded_id_chains_survive_archive() {
     assert_eq!(
         match newtype.wrapped() {
             WholeLogosTypeReference::Identity(identity) => identity,
+            WholeLogosTypeReference::Parameter(_) => panic!("parameter reference"),
             WholeLogosTypeReference::Application(_) => panic!("identity reference"),
         }
         .chain()
@@ -154,6 +155,7 @@ fn ordered_typed_items_and_complete_encoded_id_chains_survive_archive() {
     assert_eq!(
         match newtype.wrapped() {
             WholeLogosTypeReference::Identity(identity) => identity.root_variant(),
+            WholeLogosTypeReference::Parameter(_) => panic!("parameter reference"),
             WholeLogosTypeReference::Application(_) => panic!("identity reference"),
         },
         &VocabularyRoot::Universal
@@ -190,7 +192,44 @@ fn the_whole_logos_variant_is_outside_the_pure_content_hash() {
     let identity = whole.content_identity().expect("whole content identity");
     assert!(matches!(identity, WholeLogosContentIdentity::WholeLogos(_)));
     assert_eq!(identity.content_addressed_hash().bytes(), &expected);
-    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V7_IDENTITY);
+    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V8_IDENTITY);
+}
+
+#[test]
+fn picked_up_type_parameters_retain_names_and_bounds_through_archive() {
+    let ordered = encoded_id(VocabularyRoot::Universal, &[60]);
+    let result = encoded_id(VocabularyRoot::Rust, &[61]);
+    let error = encoded_id(VocabularyRoot::Universal, &[62]);
+    let wrapped = WholeLogosTypeReference::Application(
+        WholeLogosTypeApplication::new(
+            result,
+            vec![
+                WholeLogosTypeReference::Parameter(ordered.clone()),
+                WholeLogosTypeReference::Identity(error),
+            ],
+        )
+        .expect("non-empty Result application"),
+    );
+    let original = WholeLogos::new(vec![WholeLogosItem::Newtype(
+        WholeLogosNewtype::new(
+            WholeLogosVisibility::Public,
+            encoded_id(VocabularyRoot::Universal, &[63]),
+            WholeLogosVisibility::Private,
+            wrapped,
+        )
+        .with_type_parameters(vec![core_logos::WholeLogosTypeParameter::new(
+            ordered.clone(),
+            ordered,
+        )]),
+    )]);
+
+    let archive = original
+        .to_archive_bytes()
+        .expect("archive parameterized newtype");
+    assert_eq!(
+        WholeLogos::from_archive_bytes(&archive).expect("restore parameterized newtype"),
+        original
+    );
 }
 
 #[test]

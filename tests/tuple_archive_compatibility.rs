@@ -2,8 +2,8 @@ use std::mem::{align_of, size_of};
 
 use core_logos::{
     WholeLogosEnumeration, WholeLogosNewtype, WholeLogosTupleFields, WholeLogosTypeApplication,
-    WholeLogosTypeAttributes, WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload,
-    WholeLogosVisibility,
+    WholeLogosTypeAttributes, WholeLogosTypeParameter, WholeLogosTypeReference, WholeLogosVariant,
+    WholeLogosVariantPayload, WholeLogosVisibility,
 };
 use encoded_name_table::LocalEncodedId;
 use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
@@ -16,6 +16,7 @@ struct NamedWholeLogosNewtype {
     attributes: WholeLogosTypeAttributes,
     visibility: WholeLogosVisibility,
     name: VocabularyEncodedId,
+    type_parameters: Vec<WholeLogosTypeParameter>,
     wrapped_visibility: WholeLogosVisibility,
     wrapped: WholeLogosTypeReference,
 }
@@ -155,6 +156,7 @@ fn named_fields_preserve_every_whole_logos_tuple_carrier_archive() {
             attributes: WholeLogosTypeAttributes::Plain,
             visibility: WholeLogosVisibility::Public,
             name: newtype_name,
+            type_parameters: Vec::new(),
             wrapped_visibility: WholeLogosVisibility::Private,
             wrapped,
         }
