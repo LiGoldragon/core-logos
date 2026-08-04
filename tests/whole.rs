@@ -1,9 +1,10 @@
 use capsule_content_identity::{IdentityHasher, PortableArchive};
 use core_logos::{
     WholeLogos, WholeLogosContentIdentity, WholeLogosEnumeration, WholeLogosItem,
-    WholeLogosNewtype, WholeLogosStorageFingerprint, WholeLogosTable, WholeLogosTupleFields,
-    WholeLogosTypeApplication, WholeLogosTypeAttributes, WholeLogosTypeReference,
-    WholeLogosVariant, WholeLogosVariantPayload, WholeLogosVisibility,
+    WholeLogosNewtype, WholeLogosStorageFingerprint, WholeLogosStreamHandle,
+    WholeLogosStreamInitiation, WholeLogosStreamLifecycle, WholeLogosStreamTermination,
+    WholeLogosTable, WholeLogosTupleFields, WholeLogosTypeApplication, WholeLogosTypeAttributes,
+    WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload, WholeLogosVisibility,
 };
 use encoded_name_table::LocalEncodedId;
 use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
@@ -29,6 +30,27 @@ fn newtype(name: &[u16], wrapped: &[u16]) -> WholeLogosItem {
         encoded_id(VocabularyRoot::Universal, name),
         WholeLogosVisibility::Private,
         WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, wrapped)),
+    ))
+}
+
+fn stream_lifecycle(event: &[u16]) -> WholeLogosItem {
+    let identity = encoded_id(VocabularyRoot::Universal, &[70, 3]);
+    WholeLogosItem::StreamLifecycle(WholeLogosStreamLifecycle::new(
+        encoded_id(VocabularyRoot::Universal, &[70, 1]),
+        WholeLogosStreamInitiation::new(
+            encoded_id(VocabularyRoot::Universal, &[70, 2]),
+            WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[71, 1])),
+            WholeLogosStreamHandle::new(
+                identity.clone(),
+                WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, event)),
+            ),
+            encoded_id(VocabularyRoot::Universal, &[70, 4]),
+        ),
+        WholeLogosStreamTermination::new(
+            encoded_id(VocabularyRoot::Universal, &[70, 5]),
+            identity,
+            encoded_id(VocabularyRoot::Universal, &[70, 6]),
+        ),
     ))
 }
 
@@ -179,6 +201,37 @@ fn a_behavior_affecting_item_mutation_moves_whole_content_identity() {
     let boolean = WholeLogos::new(vec![newtype(&[1, 1], &[4])]);
 
     assert_ne!(hash(&integer), hash(&boolean));
+}
+
+#[test]
+fn stream_lifecycle_archives_typed_direct_success_and_separate_termination() {
+    let original = WholeLogos::new(vec![stream_lifecycle(&[72, 1])]);
+    let archive = original
+        .to_archive_bytes()
+        .expect("archive resolved stream lifecycle");
+    let restored =
+        WholeLogos::from_archive_bytes(&archive).expect("restore resolved stream lifecycle");
+
+    assert_eq!(restored, original);
+    let WholeLogosItem::StreamLifecycle(lifecycle) = &restored.items()[0] else {
+        panic!("stream lifecycle fixture")
+    };
+    assert_eq!(
+        lifecycle.initiation().success().identity(),
+        lifecycle.termination().identity()
+    );
+    assert_eq!(
+        lifecycle.initiation().success().event(),
+        &WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[72, 1]))
+    );
+}
+
+#[test]
+fn stream_event_type_is_part_of_whole_logos_content_identity() {
+    let first_event = WholeLogos::new(vec![stream_lifecycle(&[72, 1])]);
+    let second_event = WholeLogos::new(vec![stream_lifecycle(&[72, 2])]);
+
+    assert_ne!(hash(&first_event), hash(&second_event));
 }
 
 #[test]

@@ -203,10 +203,112 @@ impl WholeLogos {
                         table.key(),
                     )?;
                 }
+                WholeLogosItem::StreamLifecycle(lifecycle) => {
+                    validate_universal_declaration(
+                        item_index,
+                        WholeLogosEncodedIdPosition::StreamName,
+                        lifecycle.stream(),
+                    )?;
+                    validate_universal_declaration(
+                        item_index,
+                        WholeLogosEncodedIdPosition::StreamInitiationInput,
+                        lifecycle.initiation().input(),
+                    )?;
+                    validate_reference(
+                        item_index,
+                        WholeLogosEncodedIdPosition::StreamQuery,
+                        lifecycle.initiation().query(),
+                    )?;
+                    validate_reference(
+                        item_index,
+                        WholeLogosEncodedIdPosition::StreamEvent,
+                        lifecycle.initiation().success().event(),
+                    )?;
+                    validate_universal_declaration(
+                        item_index,
+                        WholeLogosEncodedIdPosition::StreamIdentity,
+                        lifecycle.initiation().success().identity(),
+                    )?;
+                    validate_universal_declaration(
+                        item_index,
+                        WholeLogosEncodedIdPosition::StreamInitiationRefusal,
+                        lifecycle.initiation().refusal(),
+                    )?;
+                    validate_universal_declaration(
+                        item_index,
+                        WholeLogosEncodedIdPosition::StreamTerminationInput,
+                        lifecycle.termination().input(),
+                    )?;
+                    validate_universal_declaration(
+                        item_index,
+                        WholeLogosEncodedIdPosition::StreamIdentity,
+                        lifecycle.termination().identity(),
+                    )?;
+                    validate_universal_declaration(
+                        item_index,
+                        WholeLogosEncodedIdPosition::StreamTerminationRefusal,
+                        lifecycle.termination().refusal(),
+                    )?;
+                    if lifecycle.initiation().success().identity()
+                        != lifecycle.termination().identity()
+                    {
+                        return Err(
+                            WholeLogosArchiveError::StreamTerminationIdentityDoesNotMatch {
+                                item_index,
+                                initiation: lifecycle.initiation().success().identity().clone(),
+                                termination: lifecycle.termination().identity().clone(),
+                            },
+                        );
+                    }
+                    validate_distinct_stream_lifecycle_ids(item_index, lifecycle)?;
+                }
             }
         }
         Ok(())
     }
+}
+
+fn validate_distinct_stream_lifecycle_ids(
+    item_index: usize,
+    lifecycle: &WholeLogosStreamLifecycle,
+) -> Result<(), WholeLogosArchiveError> {
+    let ids = [
+        (WholeLogosEncodedIdPosition::StreamName, lifecycle.stream()),
+        (
+            WholeLogosEncodedIdPosition::StreamInitiationInput,
+            lifecycle.initiation().input(),
+        ),
+        (
+            WholeLogosEncodedIdPosition::StreamIdentity,
+            lifecycle.initiation().success().identity(),
+        ),
+        (
+            WholeLogosEncodedIdPosition::StreamInitiationRefusal,
+            lifecycle.initiation().refusal(),
+        ),
+        (
+            WholeLogosEncodedIdPosition::StreamTerminationInput,
+            lifecycle.termination().input(),
+        ),
+        (
+            WholeLogosEncodedIdPosition::StreamTerminationRefusal,
+            lifecycle.termination().refusal(),
+        ),
+    ];
+    for (index, (position, encoded_id)) in ids.iter().enumerate() {
+        if let Some((prior_position, _)) = ids[..index]
+            .iter()
+            .find(|(_, prior_id)| *prior_id == *encoded_id)
+        {
+            return Err(WholeLogosArchiveError::RepeatedStreamLifecycleId {
+                item_index,
+                first: *prior_position,
+                second: *position,
+                encoded_id: (*encoded_id).clone(),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn validate_universal_declaration(
@@ -344,6 +446,170 @@ pub enum WholeLogosItem {
     TraitImpl(WholeLogosTraitImpl),
     /// A domain-keyed Sema table declaration.
     Table(WholeLogosTable),
+    /// One resolved stream lifecycle, from authored initiation through typed
+    /// direct success and its separately named termination input/refusal.
+    StreamLifecycle(WholeLogosStreamLifecycle),
+}
+
+/// A complete, lowered lifecycle for one authored stream declaration.
+///
+/// The authored declaration has initiation syntax only; termination is implied
+/// by that declaration. The generated contract nevertheless contains a
+/// separate termination input because consuming a running handle is a distinct
+/// runtime action. No registry, queue, allocation, or runtime behavior lives
+/// in this archiveable language contract.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosStreamLifecycle {
+    stream: VocabularyEncodedId,
+    initiation: WholeLogosStreamInitiation,
+    termination: WholeLogosStreamTermination,
+}
+
+impl WholeLogosStreamLifecycle {
+    /// Construct the complete lifecycle for one authored stream declaration.
+    pub fn new(
+        stream: VocabularyEncodedId,
+        initiation: WholeLogosStreamInitiation,
+        termination: WholeLogosStreamTermination,
+    ) -> Self {
+        Self {
+            stream,
+            initiation,
+            termination,
+        }
+    }
+
+    /// Authored stream declaration identity.
+    pub const fn stream(&self) -> &VocabularyEncodedId {
+        &self.stream
+    }
+
+    /// Initiation input, typed query, direct success handle, and refusal.
+    pub const fn initiation(&self) -> &WholeLogosStreamInitiation {
+        &self.initiation
+    }
+
+    /// Separate termination input over that same typed handle and its refusal.
+    pub const fn termination(&self) -> &WholeLogosStreamTermination {
+        &self.termination
+    }
+}
+
+/// The fully resolved initiation operation of a stream lifecycle.
+///
+/// A Rust Logos assembly emits its [`success`](Self::success) as
+/// `protos::Stream<Event>`: the event type remains explicit here and the
+/// identity is the generated handle's stable typed identity.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosStreamInitiation {
+    input: VocabularyEncodedId,
+    query: WholeLogosTypeReference,
+    success: WholeLogosStreamHandle,
+    refusal: VocabularyEncodedId,
+}
+
+impl WholeLogosStreamInitiation {
+    /// Construct one stream-initiation operation.
+    pub fn new(
+        input: VocabularyEncodedId,
+        query: WholeLogosTypeReference,
+        success: WholeLogosStreamHandle,
+        refusal: VocabularyEncodedId,
+    ) -> Self {
+        Self {
+            input,
+            query,
+            success,
+            refusal,
+        }
+    }
+
+    /// Generated input identity for the initiation query.
+    pub const fn input(&self) -> &VocabularyEncodedId {
+        &self.input
+    }
+
+    /// Typed query accepted by initiation.
+    pub const fn query(&self) -> &WholeLogosTypeReference {
+        &self.query
+    }
+
+    /// The direct typed success handle.
+    pub const fn success(&self) -> &WholeLogosStreamHandle {
+        &self.success
+    }
+
+    /// Generated refusal identity for an invalid initiation query.
+    pub const fn refusal(&self) -> &VocabularyEncodedId {
+        &self.refusal
+    }
+}
+
+/// The typed direct success of stream initiation.
+///
+/// This is the contract-level representation of `protos::Stream<Event>`; it
+/// records the generated handle identity and its event type without assigning
+/// a runtime identifier or storing an event queue.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosStreamHandle {
+    identity: VocabularyEncodedId,
+    event: WholeLogosTypeReference,
+}
+
+impl WholeLogosStreamHandle {
+    /// Construct the typed direct-success handle.
+    pub fn new(identity: VocabularyEncodedId, event: WholeLogosTypeReference) -> Self {
+        Self { identity, event }
+    }
+
+    /// Generated handle identity.
+    pub const fn identity(&self) -> &VocabularyEncodedId {
+        &self.identity
+    }
+
+    /// Event type carried by the generated `protos::Stream<Event>` handle.
+    pub const fn event(&self) -> &WholeLogosTypeReference {
+        &self.event
+    }
+}
+
+/// The implied stream-termination operation rendered as explicit generated
+/// input/output shape.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosStreamTermination {
+    input: VocabularyEncodedId,
+    identity: VocabularyEncodedId,
+    refusal: VocabularyEncodedId,
+}
+
+impl WholeLogosStreamTermination {
+    /// Construct the termination operation over an existing stream handle.
+    pub fn new(
+        input: VocabularyEncodedId,
+        identity: VocabularyEncodedId,
+        refusal: VocabularyEncodedId,
+    ) -> Self {
+        Self {
+            input,
+            identity,
+            refusal,
+        }
+    }
+
+    /// Generated input identity for the termination request.
+    pub const fn input(&self) -> &VocabularyEncodedId {
+        &self.input
+    }
+
+    /// The same generated typed handle returned by initiation success.
+    pub const fn identity(&self) -> &VocabularyEncodedId {
+        &self.identity
+    }
+
+    /// Generated refusal identity for unknown or already-closed handles.
+    pub const fn refusal(&self) -> &VocabularyEncodedId {
+        &self.refusal
+    }
 }
 
 /// A non-generic newtype declaration with a typed emission policy.
@@ -1002,6 +1268,22 @@ pub enum WholeLogosEncodedIdPosition {
     TypeParameterName,
     /// Trait-quality bound of an item-local type parameter.
     TypeParameterBound,
+    /// Authored stream declaration identity.
+    StreamName,
+    /// Generated input identity for stream initiation.
+    StreamInitiationInput,
+    /// Typed initiation-query reference.
+    StreamQuery,
+    /// Typed stream event reference.
+    StreamEvent,
+    /// Generated typed-stream handle identity.
+    StreamIdentity,
+    /// Generated refusal identity for stream initiation.
+    StreamInitiationRefusal,
+    /// Generated input identity for stream termination.
+    StreamTerminationInput,
+    /// Generated refusal identity for stream termination.
+    StreamTerminationRefusal,
 }
 
 /// A typed failure while hashing or restoring whole-Logos content.
@@ -1064,5 +1346,34 @@ pub enum WholeLogosArchiveError {
         item_index: usize,
         /// Missing parameter name.
         name: VocabularyEncodedId,
+    },
+
+    /// The generated termination operation did not consume the exact typed
+    /// handle returned by initiation success.
+    #[error(
+        "whole-Logos item {item_index} terminates {termination:?}, not initiation handle {initiation:?}"
+    )]
+    StreamTerminationIdentityDoesNotMatch {
+        /// Item containing the lifecycle contract.
+        item_index: usize,
+        /// Handle identity yielded by initiation success.
+        initiation: VocabularyEncodedId,
+        /// Handle identity consumed by termination.
+        termination: VocabularyEncodedId,
+    },
+
+    /// Two distinct generated stream roles reused one identity.
+    #[error(
+        "whole-Logos item {item_index} reuses {encoded_id:?} for stream roles {first:?} and {second:?}"
+    )]
+    RepeatedStreamLifecycleId {
+        /// Item containing the lifecycle contract.
+        item_index: usize,
+        /// First semantic role that used the identity.
+        first: WholeLogosEncodedIdPosition,
+        /// Second semantic role that reused the identity.
+        second: WholeLogosEncodedIdPosition,
+        /// Reused generated identity.
+        encoded_id: VocabularyEncodedId,
     },
 }
