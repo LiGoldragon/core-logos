@@ -29,7 +29,7 @@ struct NamedWholeLogosNewtype {
 struct NamedWholeLogosTypeApplication {
     head: VocabularyEncodedId,
     #[rkyv(omit_bounds)]
-    payload: Box<WholeLogosTypeReference>,
+    arguments: Vec<WholeLogosTypeReference>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
@@ -115,23 +115,33 @@ fn named_fields_preserve_every_whole_logos_tuple_carrier_archive() {
     };
 
     let application_head = encoded_id(VocabularyRoot::Rust, &[41, 3]);
-    let application_payload =
+    let application_argument =
         WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[41, 5, 7]));
     assert_archive_compatible!(
         WholeLogosTypeApplication,
         NamedWholeLogosTypeApplication,
-        WholeLogosTypeApplication::new(application_head.clone(), application_payload.clone()),
+        WholeLogosTypeApplication::new(
+            application_head.clone(),
+            vec![application_argument.clone()],
+        )
+        .expect("non-empty application"),
         NamedWholeLogosTypeApplication {
             head: application_head,
-            payload: Box::new(application_payload),
+            arguments: vec![application_argument],
         }
     );
 
     let newtype_name = encoded_id(VocabularyRoot::Universal, &[43, 11]);
-    let wrapped = WholeLogosTypeReference::Application(WholeLogosTypeApplication::new(
-        encoded_id(VocabularyRoot::Rust, &[43, 13]),
-        WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Rust, &[43, 17, 19])),
-    ));
+    let wrapped = WholeLogosTypeReference::Application(
+        WholeLogosTypeApplication::new(
+            encoded_id(VocabularyRoot::Rust, &[43, 13]),
+            vec![WholeLogosTypeReference::Identity(encoded_id(
+                VocabularyRoot::Rust,
+                &[43, 17, 19],
+            ))],
+        )
+        .expect("non-empty application"),
+    );
     assert_archive_compatible!(
         WholeLogosNewtype,
         NamedWholeLogosNewtype,
@@ -155,11 +165,12 @@ fn named_fields_preserve_every_whole_logos_tuple_carrier_archive() {
         WholeLogosTupleFields::new(vec![WholeLogosTypeReference::Application(
             WholeLogosTypeApplication::new(
                 encoded_id(VocabularyRoot::Rust, &[47, 37]),
-                WholeLogosTypeReference::Identity(encoded_id(
+                vec![WholeLogosTypeReference::Identity(encoded_id(
                     VocabularyRoot::Universal,
                     &[47, 41, 43],
-                )),
-            ),
+                ))],
+            )
+            .expect("non-empty application"),
         )])
         .expect("single-field variant payload"),
     );

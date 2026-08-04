@@ -8,11 +8,11 @@ use core_logos::{
 use encoded_name_table::LocalEncodedId;
 use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
 
-// Version 6 adds complete record/key storage fingerprints to Sema tables. An
-// intentional archive change replaces this under a new versioned name.
-const WHOLE_LOGOS_ARCHIVE_V6_IDENTITY: [u8; 32] = [
-    0x07, 0x57, 0xb6, 0xe5, 0x96, 0x6f, 0x32, 0x80, 0x0a, 0x6c, 0xa6, 0x32, 0xf9, 0x97, 0x5c, 0xa7,
-    0x97, 0xe7, 0xe8, 0x87, 0x3a, 0x22, 0x01, 0x79, 0xb9, 0xc4, 0x3d, 0x8f, 0xec, 0x95, 0xf7, 0x6e,
+// Version 7 admits non-empty n-ary type applications. An intentional archive
+// change replaces the preceding versioned content identity.
+const WHOLE_LOGOS_ARCHIVE_V7_IDENTITY: [u8; 32] = [
+    0xbe, 0x17, 0x62, 0x27, 0x8c, 0x50, 0x37, 0xf2, 0x66, 0xfb, 0x8e, 0x29, 0xf4, 0x0a, 0x6d, 0x90,
+    0x6f, 0x45, 0x87, 0xf4, 0xe0, 0x62, 0x6b, 0x60, 0xf8, 0x82, 0xf5, 0xf4, 0x74, 0xfb, 0x24, 0xf2,
 ];
 
 fn encoded_id(root: VocabularyRoot, chain: &[u16]) -> VocabularyEncodedId {
@@ -44,10 +44,13 @@ fn hash(whole: &WholeLogos) -> [u8; 32] {
 fn enum_and_application_shapes_retain_every_complete_chain_through_archive() {
     let vector = encoded_id(VocabularyRoot::Rust, &[4]);
     let integer = encoded_id(VocabularyRoot::Rust, &[3]);
-    let application = WholeLogosTypeReference::Application(WholeLogosTypeApplication::new(
-        vector.clone(),
-        WholeLogosTypeReference::Identity(integer.clone()),
-    ));
+    let application = WholeLogosTypeReference::Application(
+        WholeLogosTypeApplication::new(
+            vector.clone(),
+            vec![WholeLogosTypeReference::Identity(integer.clone())],
+        )
+        .expect("non-empty application"),
+    );
     let original = WholeLogos::new(vec![
         WholeLogosItem::Newtype(WholeLogosNewtype::new(
             WholeLogosVisibility::Public,
@@ -187,7 +190,53 @@ fn the_whole_logos_variant_is_outside_the_pure_content_hash() {
     let identity = whole.content_identity().expect("whole content identity");
     assert!(matches!(identity, WholeLogosContentIdentity::WholeLogos(_)));
     assert_eq!(identity.content_addressed_hash().bytes(), &expected);
-    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V6_IDENTITY);
+    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V7_IDENTITY);
+}
+
+#[test]
+fn nested_nary_type_applications_retain_argument_order_through_archive() {
+    let result = encoded_id(VocabularyRoot::Rust, &[50]);
+    let vector = encoded_id(VocabularyRoot::Rust, &[51]);
+    let ordered = encoded_id(VocabularyRoot::Universal, &[52]);
+    let error = encoded_id(VocabularyRoot::Universal, &[53]);
+    let wrapped = WholeLogosTypeReference::Application(
+        WholeLogosTypeApplication::new(
+            result,
+            vec![
+                WholeLogosTypeReference::Application(
+                    WholeLogosTypeApplication::new(
+                        vector,
+                        vec![WholeLogosTypeReference::Identity(ordered)],
+                    )
+                    .expect("nested Vector application"),
+                ),
+                WholeLogosTypeReference::Identity(error),
+            ],
+        )
+        .expect("n-ary Result application"),
+    );
+    let original = WholeLogos::new(vec![WholeLogosItem::Newtype(WholeLogosNewtype::new(
+        WholeLogosVisibility::Public,
+        encoded_id(VocabularyRoot::Universal, &[54]),
+        WholeLogosVisibility::Private,
+        wrapped,
+    ))]);
+
+    let archive = original
+        .to_archive_bytes()
+        .expect("archive n-ary application");
+    assert_eq!(
+        WholeLogos::from_archive_bytes(&archive).expect("restore n-ary application"),
+        original
+    );
+}
+
+#[test]
+fn type_applications_refuse_empty_argument_lists() {
+    assert_eq!(
+        WholeLogosTypeApplication::new(encoded_id(VocabularyRoot::Rust, &[55]), vec![]),
+        Err(core_logos::EmptyTypeArguments)
+    );
 }
 
 #[test]

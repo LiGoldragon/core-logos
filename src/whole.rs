@@ -239,7 +239,13 @@ fn validate_reference(
                 WholeLogosEncodedIdPosition::ApplicationHead,
                 application.head(),
             )?;
-            validate_reference(item_index, position, application.payload())
+            if application.arguments().is_empty() {
+                return Err(WholeLogosArchiveError::EmptyTypeArguments { item_index });
+            }
+            for argument in application.arguments() {
+                validate_reference(item_index, position, argument)?;
+            }
+            Ok(())
         }
     }
 }
@@ -488,11 +494,11 @@ impl WholeLogosStorageFingerprint {
 pub enum WholeLogosTypeReference {
     /// One complete Universal or language-vocabulary encoded-ID chain.
     Identity(VocabularyEncodedId),
-    /// One unary application.
+    /// One non-empty adjacent angle application such as `Result<Vector<T>, E>`.
     Application(WholeLogosTypeApplication),
 }
 
-/// Application head and its one payload.
+/// One non-empty, ordered generic application.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 #[rkyv(
     serialize_bounds(__S: rkyv::ser::Writer + rkyv::ser::Allocator, __S::Error: rkyv::rancor::Source),
@@ -502,15 +508,19 @@ pub enum WholeLogosTypeReference {
 pub struct WholeLogosTypeApplication {
     head: VocabularyEncodedId,
     #[rkyv(omit_bounds)]
-    payload: Box<WholeLogosTypeReference>,
+    arguments: Vec<WholeLogosTypeReference>,
 }
 
 impl WholeLogosTypeApplication {
-    /// Construct a unary application.
-    pub fn new(head: VocabularyEncodedId, payload: WholeLogosTypeReference) -> Self {
-        Self {
-            head,
-            payload: Box::new(payload),
+    /// Construct an application with one or more arguments.
+    pub fn new(
+        head: VocabularyEncodedId,
+        arguments: Vec<WholeLogosTypeReference>,
+    ) -> Result<Self, EmptyTypeArguments> {
+        if arguments.is_empty() {
+            Err(EmptyTypeArguments)
+        } else {
+            Ok(Self { head, arguments })
         }
     }
 
@@ -519,11 +529,16 @@ impl WholeLogosTypeApplication {
         &self.head
     }
 
-    /// Payload reference.
-    pub const fn payload(&self) -> &WholeLogosTypeReference {
-        &self.payload
+    /// Arguments in authored order.
+    pub fn arguments(&self) -> &[WholeLogosTypeReference] {
+        &self.arguments
     }
 }
+
+/// A type application construction attempted to encode no arguments.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+#[error("type application requires at least one argument")]
+pub struct EmptyTypeArguments;
 
 /// A non-generic enumeration with a typed emission policy.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
@@ -877,7 +892,7 @@ pub enum WholeLogosEncodedIdPosition {
     TableRecord,
     /// Authored key reference of a Sema table.
     TableKey,
-    /// Unary application head.
+    /// Generic application head.
     ApplicationHead,
 }
 
@@ -916,5 +931,12 @@ pub enum WholeLogosArchiveError {
         item_index: usize,
         /// Archived positional-field count.
         found: usize,
+    },
+
+    /// An archived type application bypassed the non-empty constructor law.
+    #[error("whole-Logos item {item_index} has a type application with no arguments")]
+    EmptyTypeArguments {
+        /// Item containing the invalid type application.
+        item_index: usize,
     },
 }

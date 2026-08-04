@@ -26,10 +26,13 @@ fn reference(chain: &[u16]) -> WholeLogosTypeReference {
 
 #[test]
 fn struct_trait_definition_and_trait_impl_round_trip_as_canonical_whole_logos() {
-    let vector_entry = WholeLogosTypeReference::Application(WholeLogosTypeApplication::new(
-        identity(VocabularyRoot::Rust, &[4]),
-        reference(&[30]),
-    ));
+    let vector_entry = WholeLogosTypeReference::Application(
+        WholeLogosTypeApplication::new(
+            identity(VocabularyRoot::Rust, &[4]),
+            vec![reference(&[30])],
+        )
+        .expect("non-empty Vector application"),
+    );
     let logos = WholeLogos::new(vec![
         WholeLogosItem::Struct(WholeLogosStruct::new(
             WholeLogosVisibility::Public,
