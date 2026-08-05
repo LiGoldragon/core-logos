@@ -744,6 +744,39 @@ impl WholeLogosStruct {
     }
 }
 
+/// One source-provenanced Sema key archive contract.
+///
+/// The key reference remains the type exposed to generated Rust, while the
+/// separate archive identity proves that Nomos resolved it from a concrete
+/// source declaration. Construction accepts the identity once, so the two
+/// representations cannot diverge after the Nomos boundary.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosSemaTableKey {
+    reference: WholeLogosTypeReference,
+    archive_identity: VocabularyEncodedId,
+}
+
+impl WholeLogosSemaTableKey {
+    /// Carry one declared key identity into Logos without reconstructing it
+    /// from a Rust spelling or archive bytes.
+    pub fn new(archive_identity: VocabularyEncodedId) -> Self {
+        Self {
+            reference: WholeLogosTypeReference::Identity(archive_identity.clone()),
+            archive_identity,
+        }
+    }
+
+    /// Generated Rust key type.
+    pub const fn reference(&self) -> &WholeLogosTypeReference {
+        &self.reference
+    }
+
+    /// Exact source-declared archive identity that authorized the key type.
+    pub const fn archive_identity(&self) -> &VocabularyEncodedId {
+        &self.archive_identity
+    }
+}
+
 /// One Sema table and the exact record/key types that define its stored shape.
 ///
 /// The table name is its stable encoded identity. Its current textual spelling
@@ -753,7 +786,7 @@ impl WholeLogosStruct {
 pub struct WholeLogosTable {
     name: VocabularyEncodedId,
     record: WholeLogosTypeReference,
-    key: WholeLogosTypeReference,
+    key: WholeLogosSemaTableKey,
     record_storage: WholeLogosStorageFingerprint,
     key_storage: WholeLogosStorageFingerprint,
     preserved_sema_family: Option<WholeLogosPreservedSemaFamily>,
@@ -764,7 +797,7 @@ impl WholeLogosTable {
     pub fn new(
         name: VocabularyEncodedId,
         record: WholeLogosTypeReference,
-        key: WholeLogosTypeReference,
+        key: WholeLogosSemaTableKey,
         record_storage: WholeLogosStorageFingerprint,
         key_storage: WholeLogosStorageFingerprint,
     ) -> Self {
@@ -804,6 +837,11 @@ impl WholeLogosTable {
 
     /// Authored key type.
     pub const fn key(&self) -> &WholeLogosTypeReference {
+        self.key.reference()
+    }
+
+    /// Source-provenanced key archive contract.
+    pub const fn key_provenance(&self) -> &WholeLogosSemaTableKey {
         &self.key
     }
 

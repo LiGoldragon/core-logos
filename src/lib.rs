@@ -78,10 +78,11 @@ pub use visibility::Visibility;
 pub use whole::{
     EmptyTypeArguments, WholeLogos, WholeLogosArchiveError, WholeLogosAssociatedTypeBinding,
     WholeLogosContentIdentity, WholeLogosEncodedIdPosition, WholeLogosEnumeration, WholeLogosItem,
-    WholeLogosNewtype, WholeLogosPreservedSemaFamily, WholeLogosStorageFingerprint,
-    WholeLogosStreamHandle, WholeLogosStreamInitiation, WholeLogosStreamLifecycle,
-    WholeLogosStreamTermination, WholeLogosStruct, WholeLogosTable, WholeLogosTraitDef,
-    WholeLogosTraitImpl, WholeLogosTraitMethod, WholeLogosTupleFields, WholeLogosTupleFieldsError,
-    WholeLogosTypeApplication, WholeLogosTypeAttributes, WholeLogosTypeParameter,
-    WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload, WholeLogosVisibility,
+    WholeLogosNewtype, WholeLogosPreservedSemaFamily, WholeLogosSemaTableKey,
+    WholeLogosStorageFingerprint, WholeLogosStreamHandle, WholeLogosStreamInitiation,
+    WholeLogosStreamLifecycle, WholeLogosStreamTermination, WholeLogosStruct, WholeLogosTable,
+    WholeLogosTraitDef, WholeLogosTraitImpl, WholeLogosTraitMethod, WholeLogosTupleFields,
+    WholeLogosTupleFieldsError, WholeLogosTypeApplication, WholeLogosTypeAttributes,
+    WholeLogosTypeParameter, WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload,
+    WholeLogosVisibility,
 };
