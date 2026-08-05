@@ -1,19 +1,20 @@
 use capsule_content_identity::{IdentityHasher, PortableArchive};
 use core_logos::{
     WholeLogos, WholeLogosContentIdentity, WholeLogosEnumeration, WholeLogosItem,
-    WholeLogosNewtype, WholeLogosStorageFingerprint, WholeLogosStreamHandle,
-    WholeLogosStreamInitiation, WholeLogosStreamLifecycle, WholeLogosStreamTermination,
-    WholeLogosTable, WholeLogosTupleFields, WholeLogosTypeApplication, WholeLogosTypeAttributes,
-    WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload, WholeLogosVisibility,
+    WholeLogosNewtype, WholeLogosPreservedSemaFamily, WholeLogosStorageFingerprint,
+    WholeLogosStreamHandle, WholeLogosStreamInitiation, WholeLogosStreamLifecycle,
+    WholeLogosStreamTermination, WholeLogosTable, WholeLogosTupleFields, WholeLogosTypeApplication,
+    WholeLogosTypeAttributes, WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload,
+    WholeLogosVisibility,
 };
 use encoded_name_table::LocalEncodedId;
 use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
 
-// Version 8 retains strict type-parameter/bound carriers. An intentional
-// archive change replaces the preceding versioned content identity.
-const WHOLE_LOGOS_ARCHIVE_V8_IDENTITY: [u8; 32] = [
-    0xd9, 0xff, 0x22, 0x80, 0xfa, 0xc8, 0xdf, 0x78, 0xdb, 0x37, 0xae, 0x2f, 0xcf, 0x41, 0x34, 0x0f,
-    0xb5, 0x1d, 0x86, 0x3b, 0x7b, 0xa7, 0xb9, 0xdb, 0x2b, 0x13, 0x08, 0xec, 0xf9, 0x91, 0xb0, 0x9a,
+// Version 9 adds an optional, provenance-validated physical Sema descriptor.
+// An intentional archive change replaces the preceding versioned content identity.
+const WHOLE_LOGOS_ARCHIVE_V9_IDENTITY: [u8; 32] = [
+    0xc1, 0x39, 0xf6, 0x00, 0x17, 0xf3, 0x54, 0x98, 0x23, 0xe4, 0xb8, 0xe0, 0x71, 0xaa, 0x7d, 0x4b,
+    0x83, 0x36, 0xd9, 0x8e, 0xae, 0xc6, 0xdc, 0xe0, 0xc2, 0xfb, 0x8b, 0x5c, 0xbd, 0xc1, 0xd9, 0x1a,
 ];
 
 fn encoded_id(root: VocabularyRoot, chain: &[u16]) -> VocabularyEncodedId {
@@ -245,7 +246,7 @@ fn the_whole_logos_variant_is_outside_the_pure_content_hash() {
     let identity = whole.content_identity().expect("whole content identity");
     assert!(matches!(identity, WholeLogosContentIdentity::WholeLogos(_)));
     assert_eq!(identity.content_addressed_hash().bytes(), &expected);
-    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V8_IDENTITY);
+    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V9_IDENTITY);
 }
 
 #[test]
@@ -397,6 +398,29 @@ fn sema_table_record_and_key_shape_survive_archive_and_move_schema_identity() {
     );
     assert_eq!(table.record_storage(), record_storage);
     assert_eq!(table.key_storage(), key_storage);
+}
+
+#[test]
+fn preserved_sema_family_retains_one_exact_physical_descriptor() {
+    let table = WholeLogosTable::new(
+        encoded_id(VocabularyRoot::Universal, &[41]),
+        WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[42])),
+        WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[43])),
+        WholeLogosStorageFingerprint::new([4; 32]),
+        WholeLogosStorageFingerprint::new([5; 32]),
+    )
+    .with_preserved_sema_family(WholeLogosPreservedSemaFamily::new(
+        "records".to_owned(),
+        "RecordsFamily".to_owned(),
+        [6; 32],
+    ));
+
+    let descriptor = table
+        .preserved_sema_family()
+        .expect("one adopted physical family");
+    assert_eq!(descriptor.table_name(), "records");
+    assert_eq!(descriptor.family_name(), "RecordsFamily");
+    assert_eq!(table.schema_hash().expect("preserved schema hash"), [6; 32]);
 }
 
 #[test]

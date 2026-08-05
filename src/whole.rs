@@ -756,6 +756,7 @@ pub struct WholeLogosTable {
     key: WholeLogosTypeReference,
     record_storage: WholeLogosStorageFingerprint,
     key_storage: WholeLogosStorageFingerprint,
+    preserved_sema_family: Option<WholeLogosPreservedSemaFamily>,
 }
 
 impl WholeLogosTable {
@@ -773,7 +774,22 @@ impl WholeLogosTable {
             key,
             record_storage,
             key_storage,
+            preserved_sema_family: None,
         }
+    }
+
+    /// Carry one exact physical Sema family adopted after provenance validation.
+    ///
+    /// The semantic table identity remains the declaration's `name`; this
+    /// evidence changes only the emitted persistence coordinate. Construction
+    /// is intentionally performed by Nomos' strict adoption boundary, never
+    /// inferred from a generated spelling.
+    pub fn with_preserved_sema_family(
+        mut self,
+        preserved_sema_family: WholeLogosPreservedSemaFamily,
+    ) -> Self {
+        self.preserved_sema_family = Some(preserved_sema_family);
+        self
     }
 
     /// Stable table/family identity.
@@ -803,12 +819,59 @@ impl WholeLogosTable {
         self.key_storage
     }
 
+    /// Exact physical descriptor adopted for a cited pre-existing family.
+    pub const fn preserved_sema_family(&self) -> Option<&WholeLogosPreservedSemaFamily> {
+        self.preserved_sema_family.as_ref()
+    }
+
     /// Content hash of this exact record/key declaration.
     pub fn schema_hash(&self) -> Result<[u8; 32], ArchiveError> {
+        if let Some(preserved) = self.preserved_sema_family() {
+            return Ok(preserved.schema_hash());
+        }
         let bytes = <Self as PortableArchive>::to_archive_bytes(self)?;
         let mut hasher = IdentityHasher::unprimed();
         hasher.update_length_prefixed(bytes.as_ref());
         Ok(hasher.finalize_bytes())
+    }
+}
+
+/// Exact physical Sema descriptor retained when a new semantic table has
+/// passed one purpose-built adoption proof against a published store family.
+///
+/// This is a transport record, not a fallback mechanism: there is one semantic
+/// table and one physical descriptor, and it carries no legacy decoder or
+/// alternate hash.
+#[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
+pub struct WholeLogosPreservedSemaFamily {
+    table_name: String,
+    family_name: String,
+    schema_hash: [u8; 32],
+}
+
+impl WholeLogosPreservedSemaFamily {
+    /// Assemble the already-validated physical descriptor.
+    pub fn new(table_name: String, family_name: String, schema_hash: [u8; 32]) -> Self {
+        Self {
+            table_name,
+            family_name,
+            schema_hash,
+        }
+    }
+
+    /// Exact persisted table coordinate.
+    pub fn table_name(&self) -> &str {
+        &self.table_name
+    }
+
+    /// Exact persisted record-family coordinate.
+    pub fn family_name(&self) -> &str {
+        &self.family_name
+    }
+
+    /// Exact persisted record-family schema hash.
+    pub const fn schema_hash(&self) -> [u8; 32] {
+        self.schema_hash
     }
 }
 
