@@ -1,437 +1,47 @@
-use capsule_content_identity::{IdentityHasher, PortableArchive};
 use core_logos::{
-    WholeLogos, WholeLogosContentIdentity, WholeLogosEnumeration, WholeLogosItem,
-    WholeLogosNewtype, WholeLogosSemaTableKey, WholeLogosStorageFingerprint,
-    WholeLogosStreamHandle, WholeLogosStreamInitiation, WholeLogosStreamLifecycle,
-    WholeLogosStreamTermination, WholeLogosTable, WholeLogosTupleFields, WholeLogosTypeApplication,
-    WholeLogosTypeAttributes, WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload,
-    WholeLogosVisibility,
+    WholeLogos, WholeLogosItem, WholeLogosNewtype, WholeLogosStreamHandle,
+    WholeLogosStreamInitiation, WholeLogosStreamLifecycle, WholeLogosStreamTermination,
+    WholeLogosTypeReference, WholeLogosVisibility,
 };
-use encoded_name_table::LocalEncodedId;
-use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
+use name_table::{EncodedName, TrueNamed};
 
-// Version 11 removes the obsolete physical Sema-family descriptor from the
-// archived table variant, changing the enclosing item layout.
-const WHOLE_LOGOS_ARCHIVE_V11_IDENTITY: [u8; 32] = [
-    0x89, 0x7e, 0x8b, 0x5b, 0x64, 0x7f, 0x14, 0x92, 0x07, 0xc1, 0x9a, 0x04, 0x99, 0xc9, 0xc8, 0xe8,
-    0x89, 0x42, 0x80, 0x21, 0xad, 0x56, 0x9a, 0xc3, 0x8a, 0x20, 0x8f, 0x85, 0x37, 0xf1, 0x02, 0x7c,
-];
-
-fn encoded_id(root: VocabularyRoot, chain: &[u16]) -> VocabularyEncodedId {
-    VocabularyEncodedId::new(
-        root,
-        chain.iter().copied().map(LocalEncodedId::new).collect(),
-    )
-    .expect("non-empty fixture encoded ID")
+fn name(seed: u8) -> EncodedName {
+    EncodedName::from_archive_bytes([seed; 16])
 }
 
-fn newtype(name: &[u16], wrapped: &[u16]) -> WholeLogosItem {
-    WholeLogosItem::Newtype(WholeLogosNewtype::new(
-        WholeLogosVisibility::Public,
-        encoded_id(VocabularyRoot::Universal, name),
-        WholeLogosVisibility::Private,
-        WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, wrapped)),
-    ))
-}
-
-fn stream_lifecycle(event: &[u16]) -> WholeLogosItem {
-    let identity = encoded_id(VocabularyRoot::Universal, &[70, 3]);
-    WholeLogosItem::StreamLifecycle(WholeLogosStreamLifecycle::new(
-        encoded_id(VocabularyRoot::Universal, &[70, 1]),
-        WholeLogosStreamInitiation::new(
-            encoded_id(VocabularyRoot::Universal, &[70, 2]),
-            WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[71, 1])),
-            WholeLogosStreamHandle::new(
-                identity.clone(),
-                WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, event)),
-            ),
-            encoded_id(VocabularyRoot::Universal, &[70, 4]),
-        ),
-        WholeLogosStreamTermination::new(
-            encoded_id(VocabularyRoot::Universal, &[70, 5]),
-            identity,
-            encoded_id(VocabularyRoot::Universal, &[70, 6]),
-        ),
-    ))
-}
-
-fn hash(whole: &WholeLogos) -> [u8; 32] {
-    *whole
-        .content_identity()
-        .expect("whole content identity")
-        .content_addressed_hash()
-        .bytes()
+fn round_trip(value: &WholeLogos) -> WholeLogos {
+    let bytes = rkyv::to_bytes::<rkyv::rancor::Error>(value).expect("archive opaque Logos");
+    rkyv::from_bytes::<WholeLogos, rkyv::rancor::Error>(&bytes).expect("restore opaque Logos")
 }
 
 #[test]
-fn enum_and_application_shapes_retain_every_complete_chain_through_archive() {
-    let vector = encoded_id(VocabularyRoot::Rust, &[4]);
-    let integer = encoded_id(VocabularyRoot::Rust, &[3]);
-    let application = WholeLogosTypeReference::Application(
-        WholeLogosTypeApplication::new(
-            vector.clone(),
-            vec![WholeLogosTypeReference::Identity(integer.clone())],
-        )
-        .expect("non-empty application"),
-    );
-    let original = WholeLogos::new(vec![
-        WholeLogosItem::Newtype(WholeLogosNewtype::new(
-            WholeLogosVisibility::Public,
-            encoded_id(VocabularyRoot::Universal, &[8, 5]),
-            WholeLogosVisibility::Private,
-            application.clone(),
-        )),
-        WholeLogosItem::Enumeration(WholeLogosEnumeration::new(
-            WholeLogosVisibility::Public,
-            encoded_id(VocabularyRoot::Universal, &[8, 6]),
-            vec![
-                WholeLogosVariant::new(
-                    encoded_id(VocabularyRoot::Universal, &[8, 6, 1]),
-                    WholeLogosVariantPayload::Unit,
-                ),
-                WholeLogosVariant::new(
-                    encoded_id(VocabularyRoot::Universal, &[8, 6, 2]),
-                    WholeLogosVariantPayload::Tuple(
-                        WholeLogosTupleFields::new(vec![application.clone()])
-                            .expect("unary tuple variant"),
-                    ),
-                ),
-                WholeLogosVariant::new(
-                    encoded_id(VocabularyRoot::Universal, &[8, 6, 3]),
-                    WholeLogosVariantPayload::Tuple(
-                        WholeLogosTupleFields::new(vec![
-                            application,
-                            WholeLogosTypeReference::Identity(integer),
-                        ])
-                        .expect("product tuple variant"),
-                    ),
-                ),
-            ],
-        )),
-    ]);
-
-    let archive = original
-        .to_archive_bytes()
-        .expect("archive broadened carrier");
-    assert_eq!(
-        WholeLogos::from_archive_bytes(&archive).expect("restore broadened carrier"),
-        original
-    );
-}
-
-#[test]
-fn rust_vocabulary_references_survive_archive_while_declarations_stay_universal() {
-    let rust_integer = encoded_id(VocabularyRoot::Rust, &[3]);
-    let original = WholeLogos::new(vec![WholeLogosItem::Newtype(WholeLogosNewtype::new(
+fn whole_logos_is_a_true_named_opaque_encoded_form() {
+    let value = WholeLogos::new(vec![WholeLogosItem::Newtype(WholeLogosNewtype::new(
         WholeLogosVisibility::Public,
-        encoded_id(VocabularyRoot::Universal, &[8, 5]),
+        name(1),
         WholeLogosVisibility::Private,
-        WholeLogosTypeReference::Identity(rust_integer.clone()),
+        WholeLogosTypeReference::Identity(name(2)),
     ))]);
-    let archive = original.to_archive_bytes().expect("archive Rust reference");
-    assert_eq!(
-        WholeLogos::from_archive_bytes(&archive).expect("restore Rust reference"),
-        original
-    );
 
-    let invalid_declaration =
-        WholeLogos::new(vec![WholeLogosItem::Newtype(WholeLogosNewtype::new(
-            WholeLogosVisibility::Public,
-            encoded_id(VocabularyRoot::Rust, &[8, 5]),
-            WholeLogosVisibility::Private,
-            WholeLogosTypeReference::Identity(rust_integer),
-        ))]);
-    let invalid_archive = invalid_declaration
-        .to_archive_bytes()
-        .expect("archive invalid declaration fixture");
-    assert!(matches!(
-        WholeLogos::from_archive_bytes(&invalid_archive),
-        Err(core_logos::WholeLogosArchiveError::NonUniversalEncodedId {
-            position: core_logos::WholeLogosEncodedIdPosition::ItemName,
-            root: VocabularyRoot::Rust,
-            ..
-        })
-    ));
+    assert_eq!(round_trip(&value), value);
+    assert!(value.true_name().is_ok());
 }
 
 #[test]
-fn ordered_typed_items_and_complete_encoded_id_chains_survive_archive() {
-    let original = WholeLogos::new(vec![newtype(&[17, 23, 41], &[3, 5])]);
-    let bytes = original.to_archive_bytes().expect("archive whole Logos");
-    let restored = WholeLogos::from_archive_bytes(&bytes).expect("restore whole Logos");
-
-    assert_eq!(restored, original);
-    let WholeLogosItem::Newtype(newtype) = &restored.items()[0] else {
-        panic!("newtype fixture")
-    };
-    assert_eq!(
-        newtype
-            .name()
-            .chain()
-            .iter()
-            .map(|local| local.value())
-            .collect::<Vec<_>>(),
-        vec![17, 23, 41],
-    );
-    assert_eq!(
-        match newtype.wrapped() {
-            WholeLogosTypeReference::Identity(identity) => identity,
-            WholeLogosTypeReference::Parameter(_) => panic!("parameter reference"),
-            WholeLogosTypeReference::Application(_) => panic!("identity reference"),
-        }
-        .chain()
-        .iter()
-        .map(|local| local.value())
-        .collect::<Vec<_>>(),
-        vec![3, 5],
-    );
-    assert_eq!(newtype.name().root_variant(), &VocabularyRoot::Universal);
-    assert_eq!(
-        match newtype.wrapped() {
-            WholeLogosTypeReference::Identity(identity) => identity.root_variant(),
-            WholeLogosTypeReference::Parameter(_) => panic!("parameter reference"),
-            WholeLogosTypeReference::Application(_) => panic!("identity reference"),
-        },
-        &VocabularyRoot::Universal
-    );
-}
-
-#[test]
-fn item_order_is_part_of_whole_content_identity() {
-    let first = newtype(&[1, 1], &[7]);
-    let second = newtype(&[1, 2], &[7]);
-
-    let in_source_order = WholeLogos::new(vec![first.clone(), second.clone()]);
-    let reversed = WholeLogos::new(vec![second, first]);
-
-    assert_ne!(hash(&in_source_order), hash(&reversed));
-}
-
-#[test]
-fn a_behavior_affecting_item_mutation_moves_whole_content_identity() {
-    let integer = WholeLogos::new(vec![newtype(&[1, 1], &[3])]);
-    let boolean = WholeLogos::new(vec![newtype(&[1, 1], &[4])]);
-
-    assert_ne!(hash(&integer), hash(&boolean));
-}
-
-#[test]
-fn stream_lifecycle_archives_typed_direct_success_and_separate_termination() {
-    let original = WholeLogos::new(vec![stream_lifecycle(&[72, 1])]);
-    let archive = original
-        .to_archive_bytes()
-        .expect("archive resolved stream lifecycle");
-    let restored =
-        WholeLogos::from_archive_bytes(&archive).expect("restore resolved stream lifecycle");
-
-    assert_eq!(restored, original);
-    let WholeLogosItem::StreamLifecycle(lifecycle) = &restored.items()[0] else {
-        panic!("stream lifecycle fixture")
-    };
-    assert_eq!(
-        lifecycle.initiation().success().identity(),
-        lifecycle.termination().identity()
-    );
-    assert_eq!(
-        lifecycle.initiation().success().event(),
-        &WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[72, 1]))
-    );
-}
-
-#[test]
-fn stream_event_type_is_part_of_whole_logos_content_identity() {
-    let first_event = WholeLogos::new(vec![stream_lifecycle(&[72, 1])]);
-    let second_event = WholeLogos::new(vec![stream_lifecycle(&[72, 2])]);
-
-    assert_ne!(hash(&first_event), hash(&second_event));
-}
-
-#[test]
-fn the_whole_logos_variant_is_outside_the_pure_content_hash() {
-    let whole = WholeLogos::new(vec![newtype(&[1, 9], &[3])]);
-    let canonical_bytes = whole.to_archive_bytes().expect("canonical whole content");
-    let mut oracle = IdentityHasher::unprimed();
-    oracle.update_length_prefixed(&canonical_bytes);
-    let expected = oracle.finalize_bytes();
-
-    let identity = whole.content_identity().expect("whole content identity");
-    assert!(matches!(identity, WholeLogosContentIdentity::WholeLogos(_)));
-    assert_eq!(identity.content_addressed_hash().bytes(), &expected);
-    assert_eq!(expected, WHOLE_LOGOS_ARCHIVE_V11_IDENTITY);
-}
-
-#[test]
-fn picked_up_type_parameters_retain_names_and_bounds_through_archive() {
-    let ordered = encoded_id(VocabularyRoot::Universal, &[60]);
-    let result = encoded_id(VocabularyRoot::Rust, &[61]);
-    let error = encoded_id(VocabularyRoot::Universal, &[62]);
-    let wrapped = WholeLogosTypeReference::Application(
-        WholeLogosTypeApplication::new(
-            result,
-            vec![
-                WholeLogosTypeReference::Parameter(ordered.clone()),
-                WholeLogosTypeReference::Identity(error),
-            ],
-        )
-        .expect("non-empty Result application"),
-    );
-    let original = WholeLogos::new(vec![WholeLogosItem::Newtype(
-        WholeLogosNewtype::new(
-            WholeLogosVisibility::Public,
-            encoded_id(VocabularyRoot::Universal, &[63]),
-            WholeLogosVisibility::Private,
-            wrapped,
-        )
-        .with_type_parameters(vec![core_logos::WholeLogosTypeParameter::new(
-            ordered.clone(),
-            ordered,
-        )]),
+fn every_stream_role_uses_an_opaque_encoded_name() {
+    let handle = name(4);
+    let value = WholeLogos::new(vec![WholeLogosItem::StreamLifecycle(
+        WholeLogosStreamLifecycle::new(
+            name(1),
+            WholeLogosStreamInitiation::new(
+                name(2),
+                WholeLogosTypeReference::Identity(name(3)),
+                WholeLogosStreamHandle::new(handle, WholeLogosTypeReference::Identity(name(5))),
+                name(6),
+            ),
+            WholeLogosStreamTermination::new(name(7), handle, name(8)),
+        ),
     )]);
 
-    let archive = original
-        .to_archive_bytes()
-        .expect("archive parameterized newtype");
-    assert_eq!(
-        WholeLogos::from_archive_bytes(&archive).expect("restore parameterized newtype"),
-        original
-    );
-}
-
-#[test]
-fn nested_nary_type_applications_retain_argument_order_through_archive() {
-    let result = encoded_id(VocabularyRoot::Rust, &[50]);
-    let vector = encoded_id(VocabularyRoot::Rust, &[51]);
-    let ordered = encoded_id(VocabularyRoot::Universal, &[52]);
-    let error = encoded_id(VocabularyRoot::Universal, &[53]);
-    let wrapped = WholeLogosTypeReference::Application(
-        WholeLogosTypeApplication::new(
-            result,
-            vec![
-                WholeLogosTypeReference::Application(
-                    WholeLogosTypeApplication::new(
-                        vector,
-                        vec![WholeLogosTypeReference::Identity(ordered)],
-                    )
-                    .expect("nested Vector application"),
-                ),
-                WholeLogosTypeReference::Identity(error),
-            ],
-        )
-        .expect("n-ary Result application"),
-    );
-    let original = WholeLogos::new(vec![WholeLogosItem::Newtype(WholeLogosNewtype::new(
-        WholeLogosVisibility::Public,
-        encoded_id(VocabularyRoot::Universal, &[54]),
-        WholeLogosVisibility::Private,
-        wrapped,
-    ))]);
-
-    let archive = original
-        .to_archive_bytes()
-        .expect("archive n-ary application");
-    assert_eq!(
-        WholeLogos::from_archive_bytes(&archive).expect("restore n-ary application"),
-        original
-    );
-}
-
-#[test]
-fn type_applications_refuse_empty_argument_lists() {
-    assert_eq!(
-        WholeLogosTypeApplication::new(encoded_id(VocabularyRoot::Rust, &[55]), vec![]),
-        Err(core_logos::EmptyTypeArguments)
-    );
-}
-
-#[test]
-fn tuple_variants_refuse_only_empty_payloads() {
-    assert_eq!(
-        WholeLogosTupleFields::new(Vec::new())
-            .expect_err("unit payload has its own variant")
-            .found(),
-        0,
-    );
-    let product = WholeLogosTupleFields::new(vec![
-        WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[1])),
-        WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[2])),
-    ])
-    .expect("nonempty product payload");
-    assert_eq!(product.fields().len(), 2);
-}
-
-#[test]
-fn type_attribute_policy_is_canonical_content() {
-    let plain = newtype(&[1, 1], &[7]);
-    let WholeLogosItem::Newtype(newtype) = plain.clone() else {
-        panic!("newtype fixture")
-    };
-    let wire = WholeLogosItem::Newtype(newtype.with_attributes(WholeLogosTypeAttributes::Wire));
-
-    assert_ne!(
-        hash(&WholeLogos::new(vec![plain])),
-        hash(&WholeLogos::new(vec![wire]))
-    );
-}
-
-#[test]
-fn sema_table_record_and_key_shape_survive_archive_and_move_schema_identity() {
-    let name = encoded_id(VocabularyRoot::Universal, &[31]);
-    let record = WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[32]));
-    let domain_key =
-        WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[33]));
-    let record_storage = WholeLogosStorageFingerprint::new([7; 32]);
-    let changed_record_storage = WholeLogosStorageFingerprint::new([8; 32]);
-    let key_storage = WholeLogosStorageFingerprint::new([9; 32]);
-    let table = WholeLogosTable::new(
-        name.clone(),
-        record.clone(),
-        WholeLogosSemaTableKey::new(match domain_key.clone() {
-            WholeLogosTypeReference::Identity(identity) => identity,
-            _ => panic!("fixture key is an identity"),
-        }),
-        record_storage,
-        key_storage,
-    );
-    let changed = WholeLogosTable::new(
-        name,
-        record,
-        WholeLogosSemaTableKey::new(match domain_key {
-            WholeLogosTypeReference::Identity(identity) => identity,
-            _ => panic!("fixture key is an identity"),
-        }),
-        changed_record_storage,
-        key_storage,
-    );
-    let whole = WholeLogos::new(vec![WholeLogosItem::Table(table.clone())]);
-
-    let archive = whole.to_archive_bytes().expect("archive Sema table");
-    assert_eq!(
-        WholeLogos::from_archive_bytes(&archive).expect("restore Sema table"),
-        whole,
-    );
-    assert_ne!(
-        table.schema_hash().expect("table schema hash"),
-        changed.schema_hash().expect("changed table schema hash"),
-    );
-    assert_eq!(table.record_storage(), record_storage);
-    assert_eq!(table.key_storage(), key_storage);
-}
-
-#[test]
-fn malformed_archives_are_refused_before_a_carrier_is_returned() {
-    let whole = WholeLogos::new(vec![newtype(&[1, 9], &[3])]);
-    let bytes = whole.to_archive_bytes().expect("archive whole content");
-
-    assert!(WholeLogos::from_archive_bytes(b"not a whole Logos archive").is_err());
-    assert!(WholeLogos::from_archive_bytes(&bytes[..bytes.len() - 1]).is_err());
-}
-
-#[test]
-fn portable_archive_and_inherent_archive_surfaces_are_identical() {
-    let whole = WholeLogos::new(vec![newtype(&[2, 6, 18], &[3])]);
-    let direct = whole.to_archive_bytes().expect("inherent archive");
-    let shared =
-        <WholeLogos as PortableArchive>::to_archive_bytes(&whole).expect("shared portable archive");
-
-    assert_eq!(direct, shared.as_ref());
+    assert_eq!(round_trip(&value), value);
 }

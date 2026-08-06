@@ -1,21 +1,25 @@
 //! The ordered whole-Logos carrier used by the vertical language slices.
 //!
-//! Every name position carries a complete production encoded-ID chain, while the supported
-//! item vocabulary covers type declarations, behavior traits, and associated-type
-//! trait implementations without carrying textual Rust spellings.
+//! Every name position carries an authority-issued opaque encoded name, while
+//! the supported item vocabulary covers type declarations, behavior traits,
+//! and associated-type trait implementations without carrying textual Rust
+//! spellings.
 
-use capsule_content_identity::{
-    ArchiveError, ContentAddressedHash, IdentityHasher, PortableArchive,
-};
-use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
+use name_table::{EncodedName, TrueNamed};
 
 /// Ordered, canonical whole-Logos content.
 ///
-/// Item order is semantic and is therefore retained in the portable archive and
-/// in [`content_identity`](Self::content_identity). This value contains no
-/// complete NameTree pin and is not a Capsule.
+/// Item order is semantic and retained in its direct portable rkyv archive.
+/// This value contains no textual projection, name-table pin, or custom
+/// whole-document hash.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogos(Vec<WholeLogosItem>);
+
+impl TrueNamed for WholeLogos {}
+
+impl structural_codec::EncodedForm for WholeLogos {
+    type Language = protos::Logos;
+}
 
 impl WholeLogos {
     /// Construct whole content in semantic item order.
@@ -32,397 +36,6 @@ impl WholeLogos {
     pub fn into_items(self) -> Vec<WholeLogosItem> {
         self.0
     }
-
-    /// Derive the Whole-Logos content identity from the canonical archive of
-    /// the complete ordered carrier.
-    ///
-    /// The outer Whole-Logos identity variant is applied after hashing. No
-    /// whole-content kind, Capsule kind, hash domain, layout tag, or NameTree pin
-    /// is folded into the hash bytes. Item variants remain part of the encoded
-    /// content itself, so changing an item's structural kind changes the hash.
-    /// This is not a Capsule-identity derivation: Capsule pin composition and the
-    /// minted-versus-derived Capsule relationship remain outside this carrier.
-    pub fn content_identity(&self) -> Result<WholeLogosContentIdentity, WholeLogosArchiveError> {
-        let bytes = <Self as PortableArchive>::to_archive_bytes(self)?;
-        let mut hasher = IdentityHasher::unprimed();
-        hasher.update_length_prefixed(bytes.as_ref());
-        Ok(WholeLogosContentIdentity::WholeLogos(
-            ContentAddressedHash::from_bytes(hasher.finalize_bytes()),
-        ))
-    }
-
-    /// Serialize the whole carrier using the shared portable archive discipline.
-    pub fn to_archive_bytes(&self) -> Result<Vec<u8>, WholeLogosArchiveError> {
-        Ok(<Self as PortableArchive>::to_archive_bytes(self)?
-            .as_ref()
-            .to_vec())
-    }
-
-    /// Restore a whole carrier after rkyv validation and encoded-ID-chain
-    /// invariant checks.
-    pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self, WholeLogosArchiveError> {
-        let restored = <Self as PortableArchive>::from_archive_bytes(bytes)?;
-        restored.validate()?;
-        Ok(restored)
-    }
-
-    fn validate(&self) -> Result<(), WholeLogosArchiveError> {
-        for (item_index, item) in self.0.iter().enumerate() {
-            match item {
-                WholeLogosItem::Newtype(newtype) => {
-                    validate_universal_declaration(
-                        item_index,
-                        WholeLogosEncodedIdPosition::ItemName,
-                        newtype.name(),
-                    )?;
-                    validate_newtype_type_parameters(item_index, newtype)?;
-                    validate_reference(
-                        item_index,
-                        WholeLogosEncodedIdPosition::NewtypeField,
-                        newtype.wrapped(),
-                    )?;
-                    validate_parameter_references(
-                        item_index,
-                        newtype.wrapped(),
-                        newtype.type_parameters(),
-                    )?;
-                }
-                WholeLogosItem::Enumeration(enumeration) => {
-                    validate_universal_declaration(
-                        item_index,
-                        WholeLogosEncodedIdPosition::ItemName,
-                        enumeration.name(),
-                    )?;
-                    for variant in enumeration.variants() {
-                        validate_universal_declaration(
-                            item_index,
-                            WholeLogosEncodedIdPosition::VariantName,
-                            variant.name(),
-                        )?;
-                        if let WholeLogosVariantPayload::Tuple(fields) = variant.payload() {
-                            if fields.fields().is_empty() {
-                                return Err(WholeLogosArchiveError::InvalidTupleVariantArity {
-                                    item_index,
-                                    found: fields.fields().len(),
-                                });
-                            }
-                            for field in fields.fields() {
-                                validate_reference(
-                                    item_index,
-                                    WholeLogosEncodedIdPosition::VariantField,
-                                    field,
-                                )?;
-                            }
-                        }
-                    }
-                }
-                WholeLogosItem::Struct(structure) => {
-                    validate_universal_declaration(
-                        item_index,
-                        WholeLogosEncodedIdPosition::ItemName,
-                        structure.name(),
-                    )?;
-                    for field in structure.fields() {
-                        validate_reference(
-                            item_index,
-                            WholeLogosEncodedIdPosition::StructField,
-                            field,
-                        )?;
-                    }
-                }
-                WholeLogosItem::TraitDef(trait_definition) => {
-                    validate_universal_declaration(
-                        item_index,
-                        WholeLogosEncodedIdPosition::ItemName,
-                        trait_definition.name(),
-                    )?;
-                    for method in trait_definition.methods() {
-                        validate_universal_declaration(
-                            item_index,
-                            WholeLogosEncodedIdPosition::MethodName,
-                            method.name(),
-                        )?;
-                        for parameter in method.parameters() {
-                            validate_reference(
-                                item_index,
-                                WholeLogosEncodedIdPosition::MethodParameter,
-                                parameter,
-                            )?;
-                        }
-                        validate_reference(
-                            item_index,
-                            WholeLogosEncodedIdPosition::MethodReturn,
-                            method.return_type(),
-                        )?;
-                    }
-                }
-                WholeLogosItem::TraitImpl(trait_implementation) => {
-                    validate_reference(
-                        item_index,
-                        WholeLogosEncodedIdPosition::ImplementedTrait,
-                        trait_implementation.implemented_trait(),
-                    )?;
-                    validate_reference(
-                        item_index,
-                        WholeLogosEncodedIdPosition::ImplementingType,
-                        trait_implementation.implementing_type(),
-                    )?;
-                    for binding in trait_implementation.associated_type_bindings() {
-                        validate_universal_declaration(
-                            item_index,
-                            WholeLogosEncodedIdPosition::AssociatedTypeName,
-                            binding.name(),
-                        )?;
-                        validate_reference(
-                            item_index,
-                            WholeLogosEncodedIdPosition::AssociatedTypeValue,
-                            binding.value(),
-                        )?;
-                    }
-                }
-                WholeLogosItem::Table(table) => {
-                    validate_universal_declaration(
-                        item_index,
-                        WholeLogosEncodedIdPosition::ItemName,
-                        table.name(),
-                    )?;
-                    validate_reference(
-                        item_index,
-                        WholeLogosEncodedIdPosition::TableRecord,
-                        table.record(),
-                    )?;
-                    validate_reference(
-                        item_index,
-                        WholeLogosEncodedIdPosition::TableKey,
-                        table.key(),
-                    )?;
-                }
-                WholeLogosItem::StreamLifecycle(lifecycle) => {
-                    validate_universal_declaration(
-                        item_index,
-                        WholeLogosEncodedIdPosition::StreamName,
-                        lifecycle.stream(),
-                    )?;
-                    validate_universal_declaration(
-                        item_index,
-                        WholeLogosEncodedIdPosition::StreamInitiationInput,
-                        lifecycle.initiation().input(),
-                    )?;
-                    validate_reference(
-                        item_index,
-                        WholeLogosEncodedIdPosition::StreamQuery,
-                        lifecycle.initiation().query(),
-                    )?;
-                    validate_reference(
-                        item_index,
-                        WholeLogosEncodedIdPosition::StreamEvent,
-                        lifecycle.initiation().success().event(),
-                    )?;
-                    validate_universal_declaration(
-                        item_index,
-                        WholeLogosEncodedIdPosition::StreamIdentity,
-                        lifecycle.initiation().success().identity(),
-                    )?;
-                    validate_universal_declaration(
-                        item_index,
-                        WholeLogosEncodedIdPosition::StreamInitiationRefusal,
-                        lifecycle.initiation().refusal(),
-                    )?;
-                    validate_universal_declaration(
-                        item_index,
-                        WholeLogosEncodedIdPosition::StreamTerminationInput,
-                        lifecycle.termination().input(),
-                    )?;
-                    validate_universal_declaration(
-                        item_index,
-                        WholeLogosEncodedIdPosition::StreamIdentity,
-                        lifecycle.termination().identity(),
-                    )?;
-                    validate_universal_declaration(
-                        item_index,
-                        WholeLogosEncodedIdPosition::StreamTerminationRefusal,
-                        lifecycle.termination().refusal(),
-                    )?;
-                    if lifecycle.initiation().success().identity()
-                        != lifecycle.termination().identity()
-                    {
-                        return Err(
-                            WholeLogosArchiveError::StreamTerminationIdentityDoesNotMatch {
-                                item_index,
-                                initiation: lifecycle.initiation().success().identity().clone(),
-                                termination: lifecycle.termination().identity().clone(),
-                            },
-                        );
-                    }
-                    validate_distinct_stream_lifecycle_ids(item_index, lifecycle)?;
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-fn validate_distinct_stream_lifecycle_ids(
-    item_index: usize,
-    lifecycle: &WholeLogosStreamLifecycle,
-) -> Result<(), WholeLogosArchiveError> {
-    let ids = [
-        (WholeLogosEncodedIdPosition::StreamName, lifecycle.stream()),
-        (
-            WholeLogosEncodedIdPosition::StreamInitiationInput,
-            lifecycle.initiation().input(),
-        ),
-        (
-            WholeLogosEncodedIdPosition::StreamIdentity,
-            lifecycle.initiation().success().identity(),
-        ),
-        (
-            WholeLogosEncodedIdPosition::StreamInitiationRefusal,
-            lifecycle.initiation().refusal(),
-        ),
-        (
-            WholeLogosEncodedIdPosition::StreamTerminationInput,
-            lifecycle.termination().input(),
-        ),
-        (
-            WholeLogosEncodedIdPosition::StreamTerminationRefusal,
-            lifecycle.termination().refusal(),
-        ),
-    ];
-    for (index, (position, encoded_id)) in ids.iter().enumerate() {
-        if let Some((prior_position, _)) = ids[..index]
-            .iter()
-            .find(|(_, prior_id)| *prior_id == *encoded_id)
-        {
-            return Err(WholeLogosArchiveError::RepeatedStreamLifecycleId {
-                item_index,
-                first: *prior_position,
-                second: *position,
-                encoded_id: (*encoded_id).clone(),
-            });
-        }
-    }
-    Ok(())
-}
-
-fn validate_universal_declaration(
-    item_index: usize,
-    position: WholeLogosEncodedIdPosition,
-    encoded_id: &VocabularyEncodedId,
-) -> Result<(), WholeLogosArchiveError> {
-    if encoded_id.chain().is_empty() {
-        return Err(WholeLogosArchiveError::EmptyEncodedId {
-            item_index,
-            position,
-        });
-    }
-    if encoded_id.root_variant() != &VocabularyRoot::Universal {
-        return Err(WholeLogosArchiveError::NonUniversalEncodedId {
-            item_index,
-            position,
-            root: *encoded_id.root_variant(),
-        });
-    }
-    Ok(())
-}
-
-fn validate_reference(
-    item_index: usize,
-    position: WholeLogosEncodedIdPosition,
-    reference: &WholeLogosTypeReference,
-) -> Result<(), WholeLogosArchiveError> {
-    match reference {
-        WholeLogosTypeReference::Identity(encoded_id) => {
-            validate_reference_encoded_id(item_index, position, encoded_id)
-        }
-        WholeLogosTypeReference::Parameter(name) => validate_reference_encoded_id(
-            item_index,
-            WholeLogosEncodedIdPosition::TypeParameterName,
-            name,
-        ),
-        WholeLogosTypeReference::Application(application) => {
-            validate_reference_encoded_id(
-                item_index,
-                WholeLogosEncodedIdPosition::ApplicationHead,
-                application.head(),
-            )?;
-            if application.arguments().is_empty() {
-                return Err(WholeLogosArchiveError::EmptyTypeArguments { item_index });
-            }
-            for argument in application.arguments() {
-                validate_reference(item_index, position, argument)?;
-            }
-            Ok(())
-        }
-    }
-}
-
-fn validate_newtype_type_parameters(
-    item_index: usize,
-    newtype: &WholeLogosNewtype,
-) -> Result<(), WholeLogosArchiveError> {
-    for (index, parameter) in newtype.type_parameters().iter().enumerate() {
-        validate_reference_encoded_id(
-            item_index,
-            WholeLogosEncodedIdPosition::TypeParameterName,
-            parameter.name(),
-        )?;
-        validate_reference_encoded_id(
-            item_index,
-            WholeLogosEncodedIdPosition::TypeParameterBound,
-            parameter.bound(),
-        )?;
-        if newtype.type_parameters()[..index]
-            .iter()
-            .any(|prior| prior.name() == parameter.name())
-        {
-            return Err(WholeLogosArchiveError::DuplicateTypeParameterName {
-                item_index,
-                name: parameter.name().clone(),
-            });
-        }
-    }
-    Ok(())
-}
-
-fn validate_parameter_references(
-    item_index: usize,
-    reference: &WholeLogosTypeReference,
-    parameters: &[WholeLogosTypeParameter],
-) -> Result<(), WholeLogosArchiveError> {
-    match reference {
-        WholeLogosTypeReference::Identity(_) => Ok(()),
-        WholeLogosTypeReference::Parameter(name) => {
-            if parameters.iter().any(|parameter| parameter.name() == name) {
-                Ok(())
-            } else {
-                Err(WholeLogosArchiveError::UndeclaredTypeParameter {
-                    item_index,
-                    name: name.clone(),
-                })
-            }
-        }
-        WholeLogosTypeReference::Application(application) => {
-            for argument in application.arguments() {
-                validate_parameter_references(item_index, argument, parameters)?;
-            }
-            Ok(())
-        }
-    }
-}
-
-fn validate_reference_encoded_id(
-    item_index: usize,
-    position: WholeLogosEncodedIdPosition,
-    encoded_id: &VocabularyEncodedId,
-) -> Result<(), WholeLogosArchiveError> {
-    if encoded_id.chain().is_empty() {
-        return Err(WholeLogosArchiveError::EmptyEncodedId {
-            item_index,
-            position,
-        });
-    }
-    Ok(())
 }
 
 /// The closed item vocabulary admitted by [`WholeLogos`].
@@ -454,7 +67,7 @@ pub enum WholeLogosItem {
 /// in this archiveable language contract.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosStreamLifecycle {
-    stream: VocabularyEncodedId,
+    stream: EncodedName,
     initiation: WholeLogosStreamInitiation,
     termination: WholeLogosStreamTermination,
 }
@@ -462,7 +75,7 @@ pub struct WholeLogosStreamLifecycle {
 impl WholeLogosStreamLifecycle {
     /// Construct the complete lifecycle for one authored stream declaration.
     pub fn new(
-        stream: VocabularyEncodedId,
+        stream: EncodedName,
         initiation: WholeLogosStreamInitiation,
         termination: WholeLogosStreamTermination,
     ) -> Self {
@@ -474,7 +87,7 @@ impl WholeLogosStreamLifecycle {
     }
 
     /// Authored stream declaration identity.
-    pub const fn stream(&self) -> &VocabularyEncodedId {
+    pub const fn stream(&self) -> &EncodedName {
         &self.stream
     }
 
@@ -496,19 +109,19 @@ impl WholeLogosStreamLifecycle {
 /// identity is the generated handle's stable typed identity.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosStreamInitiation {
-    input: VocabularyEncodedId,
+    input: EncodedName,
     query: WholeLogosTypeReference,
     success: WholeLogosStreamHandle,
-    refusal: VocabularyEncodedId,
+    refusal: EncodedName,
 }
 
 impl WholeLogosStreamInitiation {
     /// Construct one stream-initiation operation.
     pub fn new(
-        input: VocabularyEncodedId,
+        input: EncodedName,
         query: WholeLogosTypeReference,
         success: WholeLogosStreamHandle,
-        refusal: VocabularyEncodedId,
+        refusal: EncodedName,
     ) -> Self {
         Self {
             input,
@@ -519,7 +132,7 @@ impl WholeLogosStreamInitiation {
     }
 
     /// Generated input identity for the initiation query.
-    pub const fn input(&self) -> &VocabularyEncodedId {
+    pub const fn input(&self) -> &EncodedName {
         &self.input
     }
 
@@ -534,7 +147,7 @@ impl WholeLogosStreamInitiation {
     }
 
     /// Generated refusal identity for an invalid initiation query.
-    pub const fn refusal(&self) -> &VocabularyEncodedId {
+    pub const fn refusal(&self) -> &EncodedName {
         &self.refusal
     }
 }
@@ -546,18 +159,18 @@ impl WholeLogosStreamInitiation {
 /// a runtime identifier or storing an event queue.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosStreamHandle {
-    identity: VocabularyEncodedId,
+    identity: EncodedName,
     event: WholeLogosTypeReference,
 }
 
 impl WholeLogosStreamHandle {
     /// Construct the typed direct-success handle.
-    pub fn new(identity: VocabularyEncodedId, event: WholeLogosTypeReference) -> Self {
+    pub fn new(identity: EncodedName, event: WholeLogosTypeReference) -> Self {
         Self { identity, event }
     }
 
     /// Generated handle identity.
-    pub const fn identity(&self) -> &VocabularyEncodedId {
+    pub const fn identity(&self) -> &EncodedName {
         &self.identity
     }
 
@@ -571,18 +184,14 @@ impl WholeLogosStreamHandle {
 /// input/output shape.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosStreamTermination {
-    input: VocabularyEncodedId,
-    identity: VocabularyEncodedId,
-    refusal: VocabularyEncodedId,
+    input: EncodedName,
+    identity: EncodedName,
+    refusal: EncodedName,
 }
 
 impl WholeLogosStreamTermination {
     /// Construct the termination operation over an existing stream handle.
-    pub fn new(
-        input: VocabularyEncodedId,
-        identity: VocabularyEncodedId,
-        refusal: VocabularyEncodedId,
-    ) -> Self {
+    pub fn new(input: EncodedName, identity: EncodedName, refusal: EncodedName) -> Self {
         Self {
             input,
             identity,
@@ -591,17 +200,17 @@ impl WholeLogosStreamTermination {
     }
 
     /// Generated input identity for the termination request.
-    pub const fn input(&self) -> &VocabularyEncodedId {
+    pub const fn input(&self) -> &EncodedName {
         &self.input
     }
 
     /// The same generated typed handle returned by initiation success.
-    pub const fn identity(&self) -> &VocabularyEncodedId {
+    pub const fn identity(&self) -> &EncodedName {
         &self.identity
     }
 
     /// Generated refusal identity for unknown or already-closed handles.
-    pub const fn refusal(&self) -> &VocabularyEncodedId {
+    pub const fn refusal(&self) -> &EncodedName {
         &self.refusal
     }
 }
@@ -609,14 +218,14 @@ impl WholeLogosStreamTermination {
 /// A non-generic newtype declaration with a typed emission policy.
 ///
 /// Item visibility, declared encoded ID, wrapped-field visibility, and the
-/// referenced type are retained as distinct named roles. Both IDs retain their
-/// complete root-fronted chains opaquely; this carrier neither resolves nor
+/// referenced type are retained as distinct named roles. Both names remain
+/// opaque authority-issued references; this carrier neither resolves nor
 /// rewrites them.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosNewtype {
     attributes: WholeLogosTypeAttributes,
     visibility: WholeLogosVisibility,
-    name: VocabularyEncodedId,
+    name: EncodedName,
     type_parameters: Vec<WholeLogosTypeParameter>,
     wrapped_visibility: WholeLogosVisibility,
     wrapped: WholeLogosTypeReference,
@@ -626,7 +235,7 @@ impl WholeLogosNewtype {
     /// Construct one newtype item.
     pub fn new(
         visibility: WholeLogosVisibility,
-        name: VocabularyEncodedId,
+        name: EncodedName,
         wrapped_visibility: WholeLogosVisibility,
         wrapped: WholeLogosTypeReference,
     ) -> Self {
@@ -662,8 +271,8 @@ impl WholeLogosNewtype {
         &self.visibility
     }
 
-    /// The declaration's complete encoded-ID chain.
-    pub const fn name(&self) -> &VocabularyEncodedId {
+    /// The declaration's opaque encoded name.
+    pub const fn name(&self) -> &EncodedName {
         &self.name
     }
 
@@ -677,7 +286,7 @@ impl WholeLogosNewtype {
         &self.wrapped_visibility
     }
 
-    /// The wrapped type's complete encoded-ID chain.
+    /// The wrapped type's opaque encoded name.
     pub const fn wrapped(&self) -> &WholeLogosTypeReference {
         &self.wrapped
     }
@@ -692,7 +301,7 @@ impl WholeLogosNewtype {
 pub struct WholeLogosStruct {
     attributes: WholeLogosTypeAttributes,
     visibility: WholeLogosVisibility,
-    name: VocabularyEncodedId,
+    name: EncodedName,
     fields: Vec<WholeLogosTypeReference>,
 }
 
@@ -700,7 +309,7 @@ impl WholeLogosStruct {
     /// Construct one positional product.
     pub fn new(
         visibility: WholeLogosVisibility,
-        name: VocabularyEncodedId,
+        name: EncodedName,
         fields: Vec<WholeLogosTypeReference>,
     ) -> Self {
         Self {
@@ -728,7 +337,7 @@ impl WholeLogosStruct {
     }
 
     /// Complete declaration identity.
-    pub const fn name(&self) -> &VocabularyEncodedId {
+    pub const fn name(&self) -> &EncodedName {
         &self.name
     }
 
@@ -747,15 +356,15 @@ impl WholeLogosStruct {
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosSemaTableKey {
     reference: WholeLogosTypeReference,
-    archive_identity: VocabularyEncodedId,
+    archive_identity: EncodedName,
 }
 
 impl WholeLogosSemaTableKey {
     /// Carry one declared key identity into Logos without reconstructing it
     /// from a Rust spelling or archive bytes.
-    pub fn new(archive_identity: VocabularyEncodedId) -> Self {
+    pub fn new(archive_identity: EncodedName) -> Self {
         Self {
-            reference: WholeLogosTypeReference::Identity(archive_identity.clone()),
+            reference: WholeLogosTypeReference::Identity(archive_identity),
             archive_identity,
         }
     }
@@ -766,7 +375,7 @@ impl WholeLogosSemaTableKey {
     }
 
     /// Exact source-declared archive identity that authorized the key type.
-    pub const fn archive_identity(&self) -> &VocabularyEncodedId {
+    pub const fn archive_identity(&self) -> &EncodedName {
         &self.archive_identity
     }
 }
@@ -778,7 +387,7 @@ impl WholeLogosSemaTableKey {
 /// remains stable across a rename.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosTable {
-    name: VocabularyEncodedId,
+    name: EncodedName,
     record: WholeLogosTypeReference,
     key: WholeLogosSemaTableKey,
     record_storage: WholeLogosStorageFingerprint,
@@ -788,7 +397,7 @@ pub struct WholeLogosTable {
 impl WholeLogosTable {
     /// Construct one typed domain table declaration.
     pub fn new(
-        name: VocabularyEncodedId,
+        name: EncodedName,
         record: WholeLogosTypeReference,
         key: WholeLogosSemaTableKey,
         record_storage: WholeLogosStorageFingerprint,
@@ -804,7 +413,7 @@ impl WholeLogosTable {
     }
 
     /// Stable table/family identity.
-    pub const fn name(&self) -> &VocabularyEncodedId {
+    pub const fn name(&self) -> &EncodedName {
         &self.name
     }
 
@@ -834,14 +443,6 @@ impl WholeLogosTable {
     pub const fn key_storage(&self) -> WholeLogosStorageFingerprint {
         self.key_storage
     }
-
-    /// Content hash of this exact record/key declaration.
-    pub fn schema_hash(&self) -> Result<[u8; 32], ArchiveError> {
-        let bytes = <Self as PortableArchive>::to_archive_bytes(self)?;
-        let mut hasher = IdentityHasher::unprimed();
-        hasher.update_length_prefixed(bytes.as_ref());
-        Ok(hasher.finalize_bytes())
-    }
 }
 
 /// One authoritative storage-shape fingerprint carried into a table schema.
@@ -868,10 +469,10 @@ impl WholeLogosStorageFingerprint {
 /// Positional type reference carried by Whole Logos.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub enum WholeLogosTypeReference {
-    /// One complete Universal or language-vocabulary encoded-ID chain.
-    Identity(VocabularyEncodedId),
+    /// One opaque encoded type reference.
+    Identity(EncodedName),
     /// A use of an item-local type parameter, preserving its proper name.
-    Parameter(VocabularyEncodedId),
+    Parameter(EncodedName),
     /// One non-empty adjacent angle application such as `Result<Vector<T>, E>`.
     Application(WholeLogosTypeApplication),
 }
@@ -879,23 +480,23 @@ pub enum WholeLogosTypeReference {
 /// An item-local type parameter with a trait-quality bound.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosTypeParameter {
-    name: VocabularyEncodedId,
-    bound: VocabularyEncodedId,
+    name: EncodedName,
+    bound: EncodedName,
 }
 
 impl WholeLogosTypeParameter {
     /// Construct one retained parameter and its concept-layer bound.
-    pub fn new(name: VocabularyEncodedId, bound: VocabularyEncodedId) -> Self {
+    pub fn new(name: EncodedName, bound: EncodedName) -> Self {
         Self { name, bound }
     }
 
     /// Proper parameter name, never Rust-renamed in this carrier.
-    pub const fn name(&self) -> &VocabularyEncodedId {
+    pub const fn name(&self) -> &EncodedName {
         &self.name
     }
 
     /// Authored trait-quality bound.
-    pub const fn bound(&self) -> &VocabularyEncodedId {
+    pub const fn bound(&self) -> &EncodedName {
         &self.bound
     }
 }
@@ -908,7 +509,7 @@ impl WholeLogosTypeParameter {
     bytecheck(bounds(__C: rkyv::validation::ArchiveContext, __C::Error: rkyv::rancor::Source)),
 )]
 pub struct WholeLogosTypeApplication {
-    head: VocabularyEncodedId,
+    head: EncodedName,
     #[rkyv(omit_bounds)]
     arguments: Vec<WholeLogosTypeReference>,
 }
@@ -916,7 +517,7 @@ pub struct WholeLogosTypeApplication {
 impl WholeLogosTypeApplication {
     /// Construct an application with one or more arguments.
     pub fn new(
-        head: VocabularyEncodedId,
+        head: EncodedName,
         arguments: Vec<WholeLogosTypeReference>,
     ) -> Result<Self, EmptyTypeArguments> {
         if arguments.is_empty() {
@@ -927,7 +528,7 @@ impl WholeLogosTypeApplication {
     }
 
     /// Complete application-head identity.
-    pub const fn head(&self) -> &VocabularyEncodedId {
+    pub const fn head(&self) -> &EncodedName {
         &self.head
     }
 
@@ -947,7 +548,7 @@ pub struct EmptyTypeArguments;
 pub struct WholeLogosEnumeration {
     attributes: WholeLogosTypeAttributes,
     visibility: WholeLogosVisibility,
-    name: VocabularyEncodedId,
+    name: EncodedName,
     variants: Vec<WholeLogosVariant>,
 }
 
@@ -955,7 +556,7 @@ impl WholeLogosEnumeration {
     /// Construct one enumeration.
     pub fn new(
         visibility: WholeLogosVisibility,
-        name: VocabularyEncodedId,
+        name: EncodedName,
         variants: Vec<WholeLogosVariant>,
     ) -> Self {
         Self {
@@ -983,7 +584,7 @@ impl WholeLogosEnumeration {
     }
 
     /// Complete declaration identity.
-    pub const fn name(&self) -> &VocabularyEncodedId {
+    pub const fn name(&self) -> &EncodedName {
         &self.name
     }
 
@@ -997,7 +598,7 @@ impl WholeLogosEnumeration {
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosTraitDef {
     visibility: WholeLogosVisibility,
-    name: VocabularyEncodedId,
+    name: EncodedName,
     methods: Vec<WholeLogosTraitMethod>,
 }
 
@@ -1005,7 +606,7 @@ impl WholeLogosTraitDef {
     /// Construct one trait definition.
     pub fn new(
         visibility: WholeLogosVisibility,
-        name: VocabularyEncodedId,
+        name: EncodedName,
         methods: Vec<WholeLogosTraitMethod>,
     ) -> Self {
         Self {
@@ -1021,7 +622,7 @@ impl WholeLogosTraitDef {
     }
 
     /// Complete trait declaration identity.
-    pub const fn name(&self) -> &VocabularyEncodedId {
+    pub const fn name(&self) -> &EncodedName {
         &self.name
     }
 
@@ -1038,7 +639,7 @@ impl WholeLogosTraitDef {
 /// Ethos carries only positional parameter types.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosTraitMethod {
-    name: VocabularyEncodedId,
+    name: EncodedName,
     parameters: Vec<WholeLogosTypeReference>,
     return_type: WholeLogosTypeReference,
 }
@@ -1046,7 +647,7 @@ pub struct WholeLogosTraitMethod {
 impl WholeLogosTraitMethod {
     /// Construct one receiver-implied signature.
     pub fn new(
-        name: VocabularyEncodedId,
+        name: EncodedName,
         parameters: Vec<WholeLogosTypeReference>,
         return_type: WholeLogosTypeReference,
     ) -> Self {
@@ -1058,7 +659,7 @@ impl WholeLogosTraitMethod {
     }
 
     /// Complete method identity.
-    pub const fn name(&self) -> &VocabularyEncodedId {
+    pub const fn name(&self) -> &EncodedName {
         &self.name
     }
 
@@ -1114,18 +715,18 @@ impl WholeLogosTraitImpl {
 /// One associated-type equality inside a trait implementation.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosAssociatedTypeBinding {
-    name: VocabularyEncodedId,
+    name: EncodedName,
     value: WholeLogosTypeReference,
 }
 
 impl WholeLogosAssociatedTypeBinding {
     /// Construct `type name = value;`.
-    pub fn new(name: VocabularyEncodedId, value: WholeLogosTypeReference) -> Self {
+    pub fn new(name: EncodedName, value: WholeLogosTypeReference) -> Self {
         Self { name, value }
     }
 
     /// Complete associated-type identity.
-    pub const fn name(&self) -> &VocabularyEncodedId {
+    pub const fn name(&self) -> &EncodedName {
         &self.name
     }
 
@@ -1138,18 +739,18 @@ impl WholeLogosAssociatedTypeBinding {
 /// One enumeration variant.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosVariant {
-    name: VocabularyEncodedId,
+    name: EncodedName,
     payload: WholeLogosVariantPayload,
 }
 
 impl WholeLogosVariant {
     /// Construct one variant.
-    pub fn new(name: VocabularyEncodedId, payload: WholeLogosVariantPayload) -> Self {
+    pub fn new(name: EncodedName, payload: WholeLogosVariantPayload) -> Self {
         Self { name, payload }
     }
 
     /// Complete declaration identity.
-    pub const fn name(&self) -> &VocabularyEncodedId {
+    pub const fn name(&self) -> &EncodedName {
         &self.name
     }
 
@@ -1225,190 +826,12 @@ pub enum WholeLogosTypeAttributes {
 
 /// Visibility admitted by the attribute-free newtype slice.
 ///
-/// Broader Rust visibility forms remain in the legacy item algebra and do not
-/// enter this carrier until a typed full-chain shape needs them.
+/// Broader Rust visibility forms remain outside this carrier until a typed
+/// shape needs them.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub enum WholeLogosVisibility {
     /// Rust `pub`.
     Public,
     /// No emitted visibility token.
     Private,
-}
-
-/// A whole-content identity whose kind exists only in this outer variant.
-///
-/// This is intentionally not `content_identity::CapsuleIdentity`: no complete
-/// NameTree pin participates in this derivation.
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    Eq,
-    Hash,
-    Ord,
-    PartialEq,
-    PartialOrd,
-    rkyv::Archive,
-    rkyv::Deserialize,
-    rkyv::Serialize,
-)]
-pub enum WholeLogosContentIdentity {
-    /// Identity of one complete ordered [`WholeLogos`] value.
-    WholeLogos(ContentAddressedHash),
-}
-
-impl WholeLogosContentIdentity {
-    /// The inner pure-content hash.
-    pub const fn content_addressed_hash(self) -> ContentAddressedHash {
-        match self {
-            Self::WholeLogos(hash) => hash,
-        }
-    }
-}
-
-/// Which encoded-ID position failed validation while loading an archive.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum WholeLogosEncodedIdPosition {
-    /// Item declaration.
-    ItemName,
-    /// Newtype field reference.
-    NewtypeField,
-    /// Positional product field reference.
-    StructField,
-    /// Enumeration variant declaration.
-    VariantName,
-    /// Enumeration tuple-field reference.
-    VariantField,
-    /// Trait method declaration.
-    MethodName,
-    /// Trait method parameter reference.
-    MethodParameter,
-    /// Trait method return reference.
-    MethodReturn,
-    /// Implemented trait reference.
-    ImplementedTrait,
-    /// Implementing self-type reference.
-    ImplementingType,
-    /// Associated-type declaration.
-    AssociatedTypeName,
-    /// Associated-type value reference.
-    AssociatedTypeValue,
-    /// Stored record reference of a Sema table.
-    TableRecord,
-    /// Authored key reference of a Sema table.
-    TableKey,
-    /// Generic application head.
-    ApplicationHead,
-    /// Item-local type parameter name.
-    TypeParameterName,
-    /// Trait-quality bound of an item-local type parameter.
-    TypeParameterBound,
-    /// Authored stream declaration identity.
-    StreamName,
-    /// Generated input identity for stream initiation.
-    StreamInitiationInput,
-    /// Typed initiation-query reference.
-    StreamQuery,
-    /// Typed stream event reference.
-    StreamEvent,
-    /// Generated typed-stream handle identity.
-    StreamIdentity,
-    /// Generated refusal identity for stream initiation.
-    StreamInitiationRefusal,
-    /// Generated input identity for stream termination.
-    StreamTerminationInput,
-    /// Generated refusal identity for stream termination.
-    StreamTerminationRefusal,
-}
-
-/// A typed failure while hashing or restoring whole-Logos content.
-#[derive(Clone, Debug, thiserror::Error)]
-pub enum WholeLogosArchiveError {
-    /// Canonical archive serialization or validated reconstruction failed.
-    #[error("whole-Logos portable archive failed: {0}")]
-    Archive(#[from] ArchiveError),
-
-    /// A stored name position contains the empty chain reserved for table
-    /// addresses.
-    #[error("whole-Logos item {item_index} has an empty encoded-ID chain at {position:?}")]
-    EmptyEncodedId {
-        /// Ordered item index.
-        item_index: usize,
-        /// Positional encoded-ID role.
-        position: WholeLogosEncodedIdPosition,
-    },
-
-    /// A declaration belongs to language-owned rather than shared vocabulary.
-    #[error("whole-Logos item {item_index} declares non-Universal root {root:?} at {position:?}")]
-    NonUniversalEncodedId {
-        /// Ordered item index.
-        item_index: usize,
-        /// Positional encoded-ID role.
-        position: WholeLogosEncodedIdPosition,
-        /// Unexpected vocabulary root.
-        root: VocabularyRoot,
-    },
-
-    /// An archived tuple variant bypassed the nonempty constructor law.
-    #[error("whole-Logos item {item_index} has tuple variant arity {found}; expected at least one")]
-    InvalidTupleVariantArity {
-        /// Ordered item index.
-        item_index: usize,
-        /// Archived positional-field count.
-        found: usize,
-    },
-
-    /// An archived type application bypassed the non-empty constructor law.
-    #[error("whole-Logos item {item_index} has a type application with no arguments")]
-    EmptyTypeArguments {
-        /// Item containing the invalid type application.
-        item_index: usize,
-    },
-
-    /// An item declared the same type-parameter name twice.
-    #[error("whole-Logos item {item_index} repeats type parameter {name:?}")]
-    DuplicateTypeParameterName {
-        /// Item containing the duplicate.
-        item_index: usize,
-        /// Repeated parameter name.
-        name: VocabularyEncodedId,
-    },
-
-    /// A parameter use had no item-local declaration.
-    #[error("whole-Logos item {item_index} uses undeclared type parameter {name:?}")]
-    UndeclaredTypeParameter {
-        /// Item containing the use.
-        item_index: usize,
-        /// Missing parameter name.
-        name: VocabularyEncodedId,
-    },
-
-    /// The generated termination operation did not consume the exact typed
-    /// handle returned by initiation success.
-    #[error(
-        "whole-Logos item {item_index} terminates {termination:?}, not initiation handle {initiation:?}"
-    )]
-    StreamTerminationIdentityDoesNotMatch {
-        /// Item containing the lifecycle contract.
-        item_index: usize,
-        /// Handle identity yielded by initiation success.
-        initiation: VocabularyEncodedId,
-        /// Handle identity consumed by termination.
-        termination: VocabularyEncodedId,
-    },
-
-    /// Two distinct generated stream roles reused one identity.
-    #[error(
-        "whole-Logos item {item_index} reuses {encoded_id:?} for stream roles {first:?} and {second:?}"
-    )]
-    RepeatedStreamLifecycleId {
-        /// Item containing the lifecycle contract.
-        item_index: usize,
-        /// First semantic role that used the identity.
-        first: WholeLogosEncodedIdPosition,
-        /// Second semantic role that reused the identity.
-        second: WholeLogosEncodedIdPosition,
-        /// Reused generated identity.
-        encoded_id: VocabularyEncodedId,
-    },
 }

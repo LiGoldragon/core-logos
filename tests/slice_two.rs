@@ -1,94 +1,41 @@
-//! Archive and invariant witnesses for the second vertical vocabulary slice.
-
 use core_logos::{
     WholeLogos, WholeLogosAssociatedTypeBinding, WholeLogosItem, WholeLogosStruct,
-    WholeLogosTraitDef, WholeLogosTraitImpl, WholeLogosTraitMethod, WholeLogosTypeApplication,
-    WholeLogosTypeReference, WholeLogosVisibility,
+    WholeLogosTraitDef, WholeLogosTraitImpl, WholeLogosTraitMethod, WholeLogosTypeReference,
+    WholeLogosVisibility,
 };
-use encoded_name_table::LocalEncodedId;
-use signal_sema_translator::{VocabularyEncodedId, VocabularyRoot};
+use name_table::EncodedName;
 
-fn identity(root: VocabularyRoot, chain: &[u16]) -> VocabularyEncodedId {
-    VocabularyEncodedId::new(
-        root,
-        chain.iter().copied().map(LocalEncodedId::new).collect(),
-    )
-    .expect("complete fixture identity")
-}
-
-fn universal(chain: &[u16]) -> VocabularyEncodedId {
-    identity(VocabularyRoot::Universal, chain)
-}
-
-fn reference(chain: &[u16]) -> WholeLogosTypeReference {
-    WholeLogosTypeReference::Identity(universal(chain))
+fn name(seed: u8) -> EncodedName {
+    EncodedName::from_archive_bytes([seed; 16])
 }
 
 #[test]
-fn struct_trait_definition_and_trait_impl_round_trip_as_canonical_whole_logos() {
-    let vector_entry = WholeLogosTypeReference::Application(
-        WholeLogosTypeApplication::new(
-            identity(VocabularyRoot::Rust, &[4]),
-            vec![reference(&[30])],
-        )
-        .expect("non-empty Vector application"),
-    );
+fn structural_and_trait_slices_preserve_opaque_names_through_rkyv() {
+    let reference = |seed| WholeLogosTypeReference::Identity(name(seed));
     let logos = WholeLogos::new(vec![
         WholeLogosItem::Struct(WholeLogosStruct::new(
             WholeLogosVisibility::Public,
-            universal(&[10]),
-            vec![reference(&[11]), vector_entry],
+            name(1),
+            vec![reference(2)],
         )),
         WholeLogosItem::TraitDef(WholeLogosTraitDef::new(
             WholeLogosVisibility::Public,
-            universal(&[20]),
+            name(3),
             vec![WholeLogosTraitMethod::new(
-                universal(&[20, 1]),
-                vec![reference(&[30]), reference(&[31])],
-                reference(&[32]),
+                name(4),
+                vec![reference(5)],
+                reference(6),
             )],
         )),
         WholeLogosItem::TraitImpl(WholeLogosTraitImpl::new(
-            reference(&[40]),
-            reference(&[41]),
-            vec![WholeLogosAssociatedTypeBinding::new(
-                universal(&[40, 1]),
-                reference(&[42]),
-            )],
+            reference(7),
+            reference(8),
+            vec![WholeLogosAssociatedTypeBinding::new(name(9), reference(10))],
         )),
     ]);
-
-    let archive = logos.to_archive_bytes().expect("archive slice-two Logos");
+    let bytes = rkyv::to_bytes::<rkyv::rancor::Error>(&logos).expect("archive Logos");
     assert_eq!(
-        WholeLogos::from_archive_bytes(&archive).expect("restore slice-two Logos"),
+        rkyv::from_bytes::<WholeLogos, rkyv::rancor::Error>(&bytes).expect("restore Logos"),
         logos
     );
-}
-
-#[test]
-fn method_declarations_remain_universal_while_references_may_be_rust_vocabulary() {
-    let invalid = WholeLogos::new(vec![WholeLogosItem::TraitDef(WholeLogosTraitDef::new(
-        WholeLogosVisibility::Public,
-        universal(&[20]),
-        vec![WholeLogosTraitMethod::new(
-            identity(VocabularyRoot::Rust, &[20, 1]),
-            vec![WholeLogosTypeReference::Identity(identity(
-                VocabularyRoot::Rust,
-                &[30],
-            ))],
-            reference(&[32]),
-        )],
-    ))]);
-
-    let archive = invalid
-        .to_archive_bytes()
-        .expect("archive invalid fixture before invariant load");
-    assert!(matches!(
-        WholeLogos::from_archive_bytes(&archive),
-        Err(core_logos::WholeLogosArchiveError::NonUniversalEncodedId {
-            position: core_logos::WholeLogosEncodedIdPosition::MethodName,
-            root: VocabularyRoot::Rust,
-            ..
-        })
-    ));
 }
