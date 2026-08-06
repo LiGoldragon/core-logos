@@ -106,7 +106,7 @@ impl WholeLogos {
                             variant.name(),
                         )?;
                         if let WholeLogosVariantPayload::Tuple(fields) = variant.payload() {
-                            if fields.fields().len() != 1 {
+                            if fields.fields().is_empty() {
                                 return Err(WholeLogosArchiveError::InvalidTupleVariantArity {
                                     item_index,
                                     found: fields.fields().len(),
@@ -1233,20 +1233,23 @@ impl WholeLogosVariant {
 pub enum WholeLogosVariantPayload {
     /// Unit variant.
     Unit,
-    /// Exactly one positional payload field.
+    /// One or more positional payload fields.
     Tuple(WholeLogosTupleFields),
 }
 
-/// The single positional field of an enumeration payload.
+/// The nonempty positional fields of an enumeration payload.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosTupleFields(Vec<WholeLogosTypeReference>);
 
 impl WholeLogosTupleFields {
-    /// Construct an exactly-one-field tuple payload.
+    /// Construct a nonempty tuple payload.
     pub fn new(fields: Vec<WholeLogosTypeReference>) -> Result<Self, WholeLogosTupleFieldsError> {
-        match fields.len() {
-            1 => Ok(Self(fields)),
-            found => Err(WholeLogosTupleFieldsError { found }),
+        if fields.is_empty() {
+            Err(WholeLogosTupleFieldsError {
+                found: fields.len(),
+            })
+        } else {
+            Ok(Self(fields))
         }
     }
 
@@ -1256,9 +1259,9 @@ impl WholeLogosTupleFields {
     }
 }
 
-/// A tuple payload did not contain exactly one positional field.
+/// A tuple payload did not contain any positional fields.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
-#[error("tuple variant payload requires exactly one positional field, found {found}")]
+#[error("tuple variant payload requires at least one positional field, found {found}")]
 pub struct WholeLogosTupleFieldsError {
     found: usize,
 }
@@ -1415,8 +1418,8 @@ pub enum WholeLogosArchiveError {
         root: VocabularyRoot,
     },
 
-    /// An archived tuple variant bypassed the exactly-one-field constructor law.
-    #[error("whole-Logos item {item_index} has tuple variant arity {found}; expected exactly one")]
+    /// An archived tuple variant bypassed the nonempty constructor law.
+    #[error("whole-Logos item {item_index} has tuple variant arity {found}; expected at least one")]
     InvalidTupleVariantArity {
         /// Ordered item index.
         item_index: usize,

@@ -9,8 +9,9 @@ those grades explicit so legacy coverage is not mistaken for production law.
 
 The conforming carrier is `WholeLogos`. Its current closed fixture item set
 contains attribute-free tuple newtypes and attribute-free, non-generic
-enumerations with unit or positional tuple variants. Type references are
-either one complete identity or a recursive unary application. Every item and
+enumerations with unit, unary, or arbitrary nonempty positional product
+variants. Type references are
+either one complete identity or a recursive nonempty application. Every item and
 variant declaration is a complete Universal `VocabularyEncodedId` chain.
 Application heads and referenced types may instead carry a complete
 language-vocabulary chain after typed Nomos transformation; Rust vocabulary
@@ -59,9 +60,9 @@ claim.
 newtype is represented as four positional values: item visibility, declaration
 encodedID, wrapped-field visibility, and typed reference. An enumeration
 carries item visibility, declaration encodedID, and ordered variants. A variant
-carries its declaration encodedID and either unit or non-empty positional tuple
-payload. A unary type application carries a head encodedID and one recursively
-typed reference.
+carries its declaration encodedID and either a unit payload or one or more
+ordered positional payload fields. A type application carries a head encodedID
+and one or more recursively typed references.
 
 Both name positions use
 `signal_sema_translator::VocabularyEncodedId`, preserving each complete

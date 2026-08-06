@@ -92,7 +92,18 @@ fn enum_and_application_shapes_retain_every_complete_chain_through_archive() {
                 WholeLogosVariant::new(
                     encoded_id(VocabularyRoot::Universal, &[8, 6, 2]),
                     WholeLogosVariantPayload::Tuple(
-                        WholeLogosTupleFields::new(vec![application]).expect("single-field tuple"),
+                        WholeLogosTupleFields::new(vec![application.clone()])
+                            .expect("unary tuple variant"),
+                    ),
+                ),
+                WholeLogosVariant::new(
+                    encoded_id(VocabularyRoot::Universal, &[8, 6, 3]),
+                    WholeLogosVariantPayload::Tuple(
+                        WholeLogosTupleFields::new(vec![
+                            application,
+                            WholeLogosTypeReference::Identity(integer),
+                        ])
+                        .expect("product tuple variant"),
                     ),
                 ),
             ],
@@ -333,19 +344,19 @@ fn type_applications_refuse_empty_argument_lists() {
 }
 
 #[test]
-fn tuple_variants_refuse_zero_and_multiple_fields_without_rewriting_payloads() {
+fn tuple_variants_refuse_only_empty_payloads() {
     assert_eq!(
         WholeLogosTupleFields::new(Vec::new())
             .expect_err("unit payload has its own variant")
             .found(),
         0,
     );
-    let error = WholeLogosTupleFields::new(vec![
+    let product = WholeLogosTupleFields::new(vec![
         WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[1])),
         WholeLogosTypeReference::Identity(encoded_id(VocabularyRoot::Universal, &[2])),
     ])
-    .expect_err("multi-field data requires a named struct payload");
-    assert_eq!(error.found(), 2);
+    .expect("nonempty product payload");
+    assert_eq!(product.fields().len(), 2);
 }
 
 #[test]
