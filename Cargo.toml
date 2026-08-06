@@ -16,7 +16,6 @@ path = "src/lib.rs"
 capsule-content-identity = { package = "content-identity", git = "https://github.com/LiGoldragon/content-identity.git", rev = "896b21e17f31b66d0802bff899b4b60acea9c0f1" }
 name-table               = { git = "https://github.com/LiGoldragon/name-table.git", rev = "7dd5db15c16b4246c83d049c759415d3252a7d43" }
 protos                   = { git = "https://github.com/LiGoldragon/protos.git", rev = "cdc74bd28187bdb39b8ddc2228eef4934873dd45" }
-structural-codec         = { git = "https://github.com/LiGoldragon/structural-codec.git", rev = "fd3b3bebfe69" }
 rkyv                     = { version = "0.8", default-features = false, features = ["std", "bytecheck", "little_endian", "pointer_width_32", "unaligned"] }
 thiserror                = "2"
 

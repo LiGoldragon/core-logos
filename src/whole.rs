@@ -5,7 +5,7 @@
 //! and associated-type trait implementations without carrying textual Rust
 //! spellings.
 
-use name_table::{EncodedName, TrueNamed};
+use name_table::EncodedName;
 
 /// Ordered, canonical whole-Logos content.
 ///
@@ -14,12 +14,6 @@ use name_table::{EncodedName, TrueNamed};
 /// whole-document hash.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogos(Vec<WholeLogosItem>);
-
-impl TrueNamed for WholeLogos {}
-
-impl structural_codec::EncodedForm for WholeLogos {
-    type Language = protos::Logos;
-}
 
 impl WholeLogos {
     /// Construct whole content in semantic item order.
@@ -383,8 +377,7 @@ impl WholeLogosSemaTableKey {
 /// One Sema table and the exact record/key types that define its stored shape.
 ///
 /// The table name is its stable encoded identity. Its current textual spelling
-/// is a NameTree concern resolved only at Rust assembly, while the content hash
-/// remains stable across a rename.
+/// is a NameTree concern resolved only at Rust assembly.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
 pub struct WholeLogosTable {
     name: EncodedName,

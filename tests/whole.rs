@@ -3,7 +3,7 @@ use core_logos::{
     WholeLogosStreamInitiation, WholeLogosStreamLifecycle, WholeLogosStreamTermination,
     WholeLogosTypeReference, WholeLogosVisibility,
 };
-use name_table::{EncodedName, TrueNamed};
+use name_table::EncodedName;
 
 fn name(seed: u8) -> EncodedName {
     EncodedName::from_archive_bytes([seed; 16])
@@ -15,7 +15,7 @@ fn round_trip(value: &WholeLogos) -> WholeLogos {
 }
 
 #[test]
-fn whole_logos_is_a_true_named_opaque_encoded_form() {
+fn whole_logos_is_an_opaque_lowered_carrier() {
     let value = WholeLogos::new(vec![WholeLogosItem::Newtype(WholeLogosNewtype::new(
         WholeLogosVisibility::Public,
         name(1),
@@ -24,7 +24,6 @@ fn whole_logos_is_a_true_named_opaque_encoded_form() {
     ))]);
 
     assert_eq!(round_trip(&value), value);
-    assert!(value.true_name().is_ok());
 }
 
 #[test]
