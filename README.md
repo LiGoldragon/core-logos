@@ -1,14 +1,17 @@
 # core-logos
 
-`WholeLogos` is the production structural carrier for Logos. It stores ordered
-positional data and complete translator-issued `VocabularyEncodedId` chains;
-Rust spelling is the textual codec's concern.
+`core-logos` defines the typed, ordered `WholeLogos` model used between
+lowering and textual emission. Its declarations and references carry opaque
+`name_table::EncodedName` values; spelling and name allocation belong to the
+caller-owned naming boundary.
 
-Its archive and content identity cover the complete ordered value. A separately issued
-Capsule can carry the outer `protos::Logos` kind and opaque complete NameTree
-pin without deriving or inspecting that pin.
+`WholeLogos` is semantic data, not an object-identity mechanism. The crate
+also defines archiveable representations and compatibility tests for those
+representations. Storage fingerprints on table declarations describe storage
+shape compatibility only; they do not identify a Whole Logos value.
+
+Run the checks with:
 
 ```sh
-cargo test --all-targets
-nix flake check --max-jobs 0
+CARGO_BUILD_JOBS=2 cargo test --all-targets
 ```
