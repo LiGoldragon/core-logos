@@ -13,8 +13,7 @@ pub use capsule::capsule_from_issued_hash;
 pub use whole::{
     EmptyTypeArguments, WholeLogos, WholeLogosAssociatedTypeBinding, WholeLogosEnumeration,
     WholeLogosItem, WholeLogosNewtype, WholeLogosSemaTableKey, WholeLogosStorageFingerprint,
-    WholeLogosStreamHandle, WholeLogosStreamInitiation, WholeLogosStreamLifecycle,
-    WholeLogosStreamTermination, WholeLogosStruct, WholeLogosTable, WholeLogosTraitDef,
+    WholeLogosStruct, WholeLogosTable, WholeLogosTraitDef,
     WholeLogosTraitImpl, WholeLogosTraitMethod, WholeLogosTupleFields, WholeLogosTupleFieldsError,
     WholeLogosTypeApplication, WholeLogosTypeAttributes, WholeLogosTypeParameter,
     WholeLogosTypeReference, WholeLogosVariant, WholeLogosVariantPayload, WholeLogosVisibility,

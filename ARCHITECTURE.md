@@ -3,9 +3,9 @@
 ## Model boundary
 
 `WholeLogos` is the crate's ordered semantic carrier. It contains lowered
-items such as newtypes, structs, enumerations, traits, implementations,
-tables, and stream lifecycle declarations. Names are opaque `EncodedName`
-values, so this crate does not assign names or turn them into text.
+items such as newtypes, structs, enumerations, traits, implementations, and
+tables. Names are opaque `EncodedName` values, so this crate does not assign
+names or turn them into text.
 
 Sibling crates own parsing, lowering, and target-language emission. They pass
 typed Whole Logos values into or out of this model; naming mechanisms remain
