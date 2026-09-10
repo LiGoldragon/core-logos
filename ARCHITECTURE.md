@@ -11,6 +11,12 @@ Sibling crates own parsing, lowering, and target-language emission. They pass
 typed Whole Logos values into or out of this model; naming mechanisms remain
 outside this crate.
 
+The model therefore does not implement `Protosizable` or manufacture an
+extent. A textual sibling can only construct the final Protos structure and
+its source extents after resolving the opaque names. The retired whole-Logos
+Capsule constructor carried caller values without performing that conversion
+and is not part of this boundary.
+
 ## Archive and storage compatibility
 
 The public model is archiveable with rkyv, and compatibility tests protect

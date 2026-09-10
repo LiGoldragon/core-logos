@@ -10,6 +10,12 @@ also defines archiveable representations and compatibility tests for those
 representations. Storage fingerprints on table declarations describe storage
 shape compatibility only; they do not identify a Whole Logos value.
 
+Core Logos has no Protos conversion surface. Protos conversion belongs to a
+sibling textual boundary after opaque names have been resolved; that boundary
+must create the structural Protos nodes and their source extents. Version 0.28
+removes the former `Capsule<Logos, _>` pass-through and its obsolete Protos and
+content-identity dependencies.
+
 Run the checks with:
 
 ```sh
