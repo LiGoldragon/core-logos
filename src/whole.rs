@@ -45,7 +45,7 @@ pub enum WholeLogosItem {
     TraitDef(WholeLogosTraitDef),
     /// A trait implementation containing associated-type equalities.
     TraitImpl(WholeLogosTraitImpl),
-    /// A domain-keyed Sema table declaration.
+    /// A domain-keyed Memory table declaration.
     Table(WholeLogosTable),
 }
 
@@ -181,19 +181,19 @@ impl WholeLogosStruct {
     }
 }
 
-/// One source-provenanced Sema key archive contract.
+/// One source-provenanced Memory key archive contract.
 ///
 /// The key reference remains the type exposed to generated Rust, while the
 /// separate archive identity proves that Nomos resolved it from a concrete
 /// source declaration. Construction accepts the identity once, so the two
 /// representations cannot diverge after the Nomos boundary.
 #[derive(Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Deserialize, rkyv::Serialize)]
-pub struct WholeLogosSemaTableKey {
+pub struct WholeLogosMemoryTableKey {
     reference: WholeLogosTypeReference,
     archive_identity: EncodedName,
 }
 
-impl WholeLogosSemaTableKey {
+impl WholeLogosMemoryTableKey {
     /// Carry one declared key identity into Logos without reconstructing it
     /// from a Rust spelling or archive bytes.
     pub fn new(archive_identity: EncodedName) -> Self {
@@ -214,7 +214,7 @@ impl WholeLogosSemaTableKey {
     }
 }
 
-/// One Sema table and the exact record/key types that define its stored shape.
+/// One Memory table and the exact record/key types that define its stored shape.
 ///
 /// The table name is its stable encoded identity. Its current textual spelling
 /// is a NameTree concern resolved only at Rust assembly.
@@ -222,7 +222,7 @@ impl WholeLogosSemaTableKey {
 pub struct WholeLogosTable {
     name: EncodedName,
     record: WholeLogosTypeReference,
-    key: WholeLogosSemaTableKey,
+    key: WholeLogosMemoryTableKey,
     record_storage: WholeLogosStorageFingerprint,
     key_storage: WholeLogosStorageFingerprint,
 }
@@ -232,7 +232,7 @@ impl WholeLogosTable {
     pub fn new(
         name: EncodedName,
         record: WholeLogosTypeReference,
-        key: WholeLogosSemaTableKey,
+        key: WholeLogosMemoryTableKey,
         record_storage: WholeLogosStorageFingerprint,
         key_storage: WholeLogosStorageFingerprint,
     ) -> Self {
@@ -261,7 +261,7 @@ impl WholeLogosTable {
     }
 
     /// Source-provenanced key archive contract.
-    pub const fn key_provenance(&self) -> &WholeLogosSemaTableKey {
+    pub const fn key_provenance(&self) -> &WholeLogosMemoryTableKey {
         &self.key
     }
 
@@ -653,7 +653,7 @@ pub enum WholeLogosTypeAttributes {
     Plain,
     /// The canonical Interface wire preamble.
     Wire,
-    /// The portable rkyv value preamble for Sema record types.
+    /// The portable rkyv value preamble for Memory record types.
     Stored,
 }
 

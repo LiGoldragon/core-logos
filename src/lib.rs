@@ -10,7 +10,7 @@ pub mod whole;
 
 pub use whole::{
     EmptyTypeArguments, WholeLogos, WholeLogosAssociatedTypeBinding, WholeLogosEnumeration,
-    WholeLogosItem, WholeLogosNewtype, WholeLogosSemaTableKey, WholeLogosStorageFingerprint,
+    WholeLogosItem, WholeLogosNewtype, WholeLogosMemoryTableKey, WholeLogosStorageFingerprint,
     WholeLogosStruct, WholeLogosTable, WholeLogosTraitDef, WholeLogosTraitImpl,
     WholeLogosTraitMethod, WholeLogosTupleFields, WholeLogosTupleFieldsError,
     WholeLogosTypeApplication, WholeLogosTypeAttributes, WholeLogosTypeParameter,
